@@ -1,544 +1,376 @@
 # exfat-sanitizer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Bash](https://img.shields.io/badge/Bash-5.0%2B-green.svg)](https://www.gnu.org/software/bash/)
-[![macOS](https://img.shields.io/badge/macOS-Supported-blue.svg)](https://www.apple.com/macos/)
-[![Linux](https://img.shields.io/badge/Linux-Supported-blue.svg)](https://www.linux.org/)
+**Cross-Platform Filename Sanitizer for exFAT, FAT32, APFS, NTFS, HFS+, and Universal Compatibility**
 
-A production-ready POSIX-compliant bash script to recursively sanitize filenames and folder names for compatibility with **exFAT** and **FAT32** file systems.
+[![Version](https://img.shields.io/badge/version-9.0.1-blue.svg)](https://github.com/fbaldassarri/exfat-sanitizer/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Shell](https://img.shields.io/badge/shell-bash-brightgreen.svg)](https://www.gnu.org/software/bash/)
 
-## Features
+A production-ready bash script that sanitizes filenames and directory names to ensure compatibility across multiple filesystems. Ideal for audio libraries, media collections, and cross-platform file management.
 
-✅ **Dual Filesystem Support**
-- exFAT mode: Permissive character handling (32,767 char path limit)
-- FAT32 mode: Strict character restrictions (255 char path limit)
+## 🚀 Features
 
-✅ **Comprehensive Sanitization**
-- Removes leading/trailing whitespace
-- Eliminates leading dots (`.file`)
-- Replaces universal forbidden characters: `< > : " / \ | ? *`
-- Removes FAT32-specific characters: `; = + [ ] ÷ ×`
-- Validates path lengths against filesystem limits
-- Detects and prevents naming collisions
+### Core Capabilities
+- **Multi-Filesystem Support**: exFAT, FAT32, APFS, NTFS, HFS+, Universal
+- **Three Sanitization Modes**: Strict, Conservative, Permissive
+- **Dry Run Mode**: Preview all changes before applying them
+- **Comprehensive Logging**: CSV export with detailed change tracking
+- **Tree Export**: Optional directory structure visualization
+- **Copy Mode**: Sanitize files to a new destination
+- **Collision Detection**: Prevents filename conflicts
+- **Path Length Validation**: Ensures compatibility with filesystem limits
+- **System File Filtering**: Automatically skips `.DS_Store`, `Thumbs.db`, and other system files
 
-✅ **Safe & Non-Destructive**
-- Dry-run mode (default) previews all changes without execution
-- Dry-run CSV logging for verification
-- Full audit trail in CSV format
-- System file protection (`.DS_Store`, `Thumbs.db`, `.sync`, etc.)
+### Safety Features
+- **Shell Safety Checks**: Removes dangerous shell metacharacters (`$`, `` ` ``, `&`, `;`, etc.)
+- **Unicode Exploit Detection**: Optional removal of zero-width and bidirectional characters
+- **Normalization Detection**: Identifies NFC/NFD Unicode differences
+- **Reserved Name Handling**: Properly handles Windows/DOS reserved names (CON, PRN, AUX, etc.)
+- **Atomic Operations**: Safe renaming with rollback on failure
 
-✅ **Production Features**
-- Directory tree export (CSV format with metadata)
-- Real-time progress reporting
-- Collision detection and prevention
-- Exit code handling for automation
-- Color-coded terminal output
-- Bash 3.2+ compatible (macOS compatible)
+### Character Coverage
+- **Universal Forbidden**: `< > : " / \ | ? * NUL`
+- **FAT32-Specific**: `+ , ; = [ ] ÷ ×`
+- **Control Characters**: `0x00-0x1F`, `0x7F` (security-critical)
+- **Unicode Line Separators**: `U+000A`, `U+000D`, `U+0085`, `U+2028`, `U+2029`
+- **Shell Metacharacters**: `$ ` & ; # ~ ^ ! ( )` (optional)
+- **Path Length Limits**: 260 chars (FAT32/exFAT), 255 chars (others)
 
-## Installation
+## 📋 Requirements
 
-### Quick Start
+- **Bash**: Version 4.0 or higher
+- **Standard Unix Tools**: `find`, `sed`, `grep`, `awk`, `mv`, `cp`
+- **macOS**: Preinstalled
+- **Linux**: Usually preinstalled
+- **Windows**: WSL, Git Bash, or Cygwin
+
+## 📦 Installation
+
+### Quick Install
 
 ```bash
-# Clone the repository
+# Download the script
+curl -O https://raw.githubusercontent.com/fbaldassarri/exfat-sanitizer/main/exfat-sanitizer-v9.0.1.sh
+
+# Make it executable
+chmod +x exfat-sanitizer-v9.0.1.sh
+
+# Run with dry-run (safe preview)
+./exfat-sanitizer-v9.0.1.sh /path/to/your/files
+```
+
+### Clone Repository
+
+```bash
 git clone https://github.com/fbaldassarri/exfat-sanitizer.git
 cd exfat-sanitizer
-
-# Make executable
-chmod +x exfat-sanitizer-v7.6.0.sh
-
-# Run with dry-run (preview mode)
-./exfat-sanitizer-v7.6.0.sh /path/to/directory
+chmod +x exfat-sanitizer-v9.0.1.sh
 ```
 
-### System Requirements
-
-- **Bash** 3.2 or later
-- **POSIX-compliant system** (macOS, Linux, BSD, etc.)
-- Standard utilities: `find`, `stat`, `sed`, `grep`
-- Write permissions to target directory (for actual execution)
-
-### Optional Setup
-
-```bash
-# Make globally accessible
-sudo cp exfat-sanitizer-v7.6.0.sh /usr/local/bin/exfat-sanitizer
-sudo chmod +x /usr/local/bin/exfat-sanitizer
-
-# Then run from anywhere
-exfat-sanitizer /path/to/directory
-```
-
-## Usage
+## 🎯 Usage
 
 ### Basic Syntax
 
 ```bash
-./exfat-sanitizer-v7.6.0.sh [target_directory]
+FILESYSTEM=<filesystem> SANITIZATION_MODE=<mode> DRY_RUN=<true|false> \
+  ./exfat-sanitizer-v9.0.1.sh <directory>
 ```
 
-### Environment Variables
+### Common Use Cases
 
-| Variable | Default | Options | Description |
-|----------|---------|---------|-------------|
-| `DRY_RUN` | `true` | `true`/`false` | Preview changes without execution |
-| `FILESYSTEM` | `exfat` | `exfat`/`fat32` | Target filesystem rules |
-| `GENERATE_TREE` | `false` | `true`/`false` | Export directory tree to CSV |
-
-### Examples
-
-#### 1. Dry-Run Preview (FAT32 mode)
-
+#### 1. **Sanitize Audio Library for exFAT USB Drive**
 ```bash
-FILESYSTEM=fat32 DRY_RUN=true ./exfat-sanitizer-v7.6.0.sh ~/Music
+# Preview changes first (dry run)
+FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
+  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
+
+# Apply changes after reviewing
+FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
 ```
 
-Output shows:
-- Proposed filename changes
-- Issues detected
+#### 2. **Clean FAT32 Drive (Legacy Compatibility)**
+```bash
+FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh /Volumes/USB_DRIVE
+```
+
+#### 3. **Optimize for macOS APFS**
+```bash
+FILESYSTEM=apfs SANITIZATION_MODE=conservative DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh ~/Documents
+```
+
+#### 4. **Maximum Security (Untrusted Sources)**
+```bash
+FILESYSTEM=universal SANITIZATION_MODE=strict \
+  CHECK_SHELL_SAFETY=true DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh ~/Downloads
+```
+
+#### 5. **Generate Directory Tree Report**
+```bash
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true \
+  ./exfat-sanitizer-v9.0.1.sh /path/to/directory
+```
+
+#### 6. **Copy to New Destination with Sanitization**
+```bash
+FILESYSTEM=exfat COPY_TO=/Volumes/Backup \
+  COPY_BEHAVIOR=version DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
+```
+
+## ⚙️ Configuration Options
+
+### Filesystem Types
+| Filesystem | Description | Use Case |
+|------------|-------------|----------|
+| `exfat` | exFAT restrictions | Modern USB drives, SD cards |
+| `fat32` | FAT32 restrictions | Older USB drives, legacy compatibility |
+| `apfs` | APFS restrictions | macOS native (Sonoma+) |
+| `ntfs` | NTFS restrictions | Windows compatibility |
+| `hfsplus` | HFS+ restrictions | Legacy macOS |
+| `universal` | Most restrictive | Unknown destination (default) |
+
+### Sanitization Modes
+| Mode | Description | Recommended For |
+|------|-------------|-----------------|
+| `strict` | Removes all problematic chars including shell-dangerous | Maximum compatibility, security-critical |
+| `conservative` | Removes only officially-forbidden chars per filesystem | Balanced approach (recommended) |
+| `permissive` | Removes only universal forbidden chars | Speed-optimized, minimal changes |
+
+### Safety Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| `CHECK_SHELL_SAFETY` | `true` | Remove shell metacharacters |
+| `CHECK_UNICODE_EXPLOITS` | `false` | Remove zero-width, bidirectional chars |
+| `CHECK_NORMALIZATION` | `false` | Detect NFC/NFD differences |
+
+### Copy Mode Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| `COPY_TO` | (empty) | Destination directory for copying |
+| `COPY_BEHAVIOR` | `skip` | Conflict resolution: `skip`, `overwrite`, `version` |
+
+### Other Options
+| Option | Default | Description |
+|--------|---------|-------------|
+| `DRY_RUN` | `true` | Preview changes without modifying |
+| `REPLACEMENT_CHAR` | `_` | Character for replacing forbidden chars |
+| `GENERATE_TREE` | `false` | Export directory tree structure |
+
+## 📊 Output Files
+
+### CSV Log File
+Format: `sanitizer_<filesystem>_<timestamp>.csv`
+
+Columns:
+- **Type**: File or Directory
+- **Old Name**: Original filename
+- **New Name**: Sanitized filename
+- **Issues**: Detected problems (e.g., `FAT32_Specific`, `Path too long`)
+- **Path**: Parent directory path
+- **Path Length**: Full path character count
+- **Status**: `RENAMED`, `LOGGED`, or `FAILED`
+- **Copy_Status**: `COPIED`, `SKIPPED`, `FAILED`, or `N/A`
+
+### Tree CSV File (Optional)
+Format: `tree_<filesystem>_<timestamp>.csv`
+
+Columns:
+- **Type**: File or Directory
+- **Name**: Item name
+- **Path**: Relative path from root
+- **Depth**: Directory nesting level
+- **Has Children**: `Yes` or `No`
+
+### Console Log File
+Format: `sanitizer_<filesystem>_<timestamp>.<mode>.log`
+
+Contains:
+- Configuration summary
+- Progress updates
+- Final statistics
+- Warnings and errors
+
+## 🛡️ System Files Automatically Skipped
+
+The following system files are **never processed** and **will not appear in CSV output**:
+
+- `.DS_Store` (macOS Finder metadata)
+- `.stfolder` (Syncthing)
+- `.sync.ffs_db`, `.sync.ffsdb` (FreeFileSync)
+- `.Spotlight-V100` (macOS Spotlight)
+- `Thumbs.db` (Windows thumbnail cache)
+- `.stignore` (Syncthing ignore)
+- `.gitignore` (Git ignore)
+- `.sync` (Generic sync metadata)
+
+## 🔍 Understanding Path Length Issues
+
+### Filesystem Limits
+- **FAT32/exFAT**: 260 characters (Windows-style limit for compatibility)
+- **APFS/NTFS/HFS+**: 255 characters (component name limit)
+- **Universal Mode**: 260 characters (most restrictive)
+
+### Common Causes of Long Paths
+1. **Deep directory nesting** (e.g., Artist > Album > Disc > Track)
+2. **Long album or artist names** (especially with featured artists)
+3. **Remix/version descriptions** (e.g., "Radio Edit", "Live at...")
+4. **Multiple featured artists** (e.g., "feat. Artist1, Artist2, Artist3")
+
+### Solutions
+1. **Shorten directory names**: Use abbreviations
+2. **Flatten structure**: Reduce nesting levels
+3. **Abbreviate descriptions**: "RM2023" instead of "Remastered 2023"
+4. **Limit featured artists**: "feat. Various" instead of listing all
+
+## 📈 Performance
+
+### Benchmarks (tested on macOS)
+- **3,555 files + 368 directories**: ~15-30 seconds (dry run)
+- **CSV generation**: Minimal overhead (<1% performance impact)
+- **Tree export**: Additional 5-10 seconds for large directories
+
+### Optimization Tips
+- Use `permissive` mode for faster processing when safety isn't critical
+- Disable `CHECK_SHELL_SAFETY` if targeting non-shell environments
+- Use `DRY_RUN=true` first to identify high-impact areas
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Issue: "Permission denied" errors**
+```bash
+# Solution: Run with appropriate permissions
+sudo ./exfat-sanitizer-v9.0.1.sh /path/to/directory
+```
+
+**Issue: "Insufficient disk space" in copy mode**
+```bash
+# Solution: Check available space
+df -h /destination/path
+```
+
+**Issue: Path too long warnings**
+```bash
+# Solution: Manually shorten long directory names first
+# Or use a different filesystem with longer path support
+```
+
+**Issue: Files not renamed in dry run**
+```bash
+# Solution: This is expected! Dry run only previews changes
+# Set DRY_RUN=false to actually apply changes
+```
+
+### Debug Mode
+```bash
+# Enable bash debug output
+bash -x ./exfat-sanitizer-v9.0.1.sh /path/to/directory 2>&1 | tee debug.log
+```
+
+## 🔄 Version History
+
+### v9.0.1 (2026-01-09)
+- **Bugfix**: System file filtering now properly excludes `.DS_Store`, `Thumbs.db`, etc.
+- **Enhancement**: System files no longer appear in CSV output
+- **Improvement**: Cleaner console output without system file processing messages
+
+### v9.0.0 (2026-01-07)
+- Production-ready implementation
+- Multi-filesystem support (exFAT, FAT32, APFS, NTFS, HFS+, Universal)
+- Three sanitization modes (strict, conservative, permissive)
+- Copy mode with conflict resolution
+- Tree export functionality
+- Comprehensive safety features
+
+### v8.0.2 (2026-01-05)
+- Enhanced CSV logging
 - Path length validation
-- Collision warnings
+- Collision detection improvements
 
-#### 2. Dry-Run with Tree Export
+## 📝 License
 
+MIT License - See [LICENSE](LICENSE) file for details
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Guidelines
+- Follow existing code style and structure
+- Add comments for complex logic
+- Test with multiple filesystem types
+- Update README with new features
+- Include example usage for new options
+
+## 💡 Tips & Best Practices
+
+### For Audio Libraries
 ```bash
-GENERATE_TREE=true DRY_RUN=true FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Music
+# Recommended: Conservative mode for music collections
+FILESYSTEM=exfat SANITIZATION_MODE=conservative \
+  CHECK_SHELL_SAFETY=false DRY_RUN=false \
+  ./exfat-sanitizer-v9.0.1.sh ~/Music
 ```
 
-Generates:
-- `tree_fat32_TIMESTAMP.csv` - Directory structure with metadata
-- `sanitizer_fat32_TIMESTAMP.csv` - Proposed changes
-- Console output with progress
-
-#### 3. Execute Actual Sanitization
-
+### For Maximum Compatibility
 ```bash
-DRY_RUN=false FILESYSTEM=exfat ./exfat-sanitizer-v7.6.0.sh ~/Documents
+# Use universal mode when targeting unknown destinations
+FILESYSTEM=universal SANITIZATION_MODE=strict \
+  DRY_RUN=false ./exfat-sanitizer-v9.0.1.sh /path/to/files
 ```
 
-**⚠️ Warning:** This performs actual renames. Always test with `DRY_RUN=true` first.
-
-#### 4. Recursive Directory Sanitization
-
+### For Safe Testing
 ```bash
-for dir in ~/Audio/*; do
-  if [ -d "$dir" ]; then
-    DRY_RUN=false FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh "$dir"
-  fi
-done
+# Always run dry run first, then review CSV output
+FILESYSTEM=exfat DRY_RUN=true ./exfat-sanitizer-v9.0.1.sh ~/Documents
+# Review: sanitizer_exfat_YYYYMMDD_HHMMSS.csv
+# Apply: DRY_RUN=false ./exfat-sanitizer-v9.0.1.sh ~/Documents
 ```
 
-#### 5. Continuous Monitoring
+## 🔗 Resources
 
-```bash
-watch -n 5 "DRY_RUN=true FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Sync"
-```
+- [exFAT Specification](https://docs.microsoft.com/en-us/windows/win32/fileio/exfat-specification)
+- [FAT32 Specification](https://en.wikipedia.org/wiki/File_Allocation_Table)
+- [APFS Reference](https://developer.apple.com/documentation/foundation/file_system)
+- [NTFS Specification](https://docs.microsoft.com/en-us/windows/win32/fileio/filesystem-functionality-comparison)
 
-## Output Files
+## ❓ FAQ
 
-### Sanitizer CSV (`sanitizer_FILESYSTEM_TIMESTAMP.csv`)
+**Q: Will this delete my files?**  
+A: No. The script only renames files and directories. In dry run mode (default), nothing is modified at all.
 
-Tab-separated log of all detected issues:
+**Q: Can I undo changes?**  
+A: The CSV log contains both old and new names, allowing manual reversal if needed. Consider copying files first using `COPY_TO` option.
 
-```csv
-Type,Old Name,New Name,Issues,Path,Path Length,Status
-Directory,"[Live Album]","_Live Album_","FAT32 Chars","/Users/user/Music",85,LOGGED
-File,"Song [Remix].mp3","Song _Remix_.mp3","FAT32 Chars","/Users/user/Music/Album",105,LOGGED
-```
+**Q: Does this work on Windows?**  
+A: Yes, with WSL (Windows Subsystem for Linux), Git Bash, or Cygwin.
 
-**Columns:**
-- `Type`: Directory or File
-- `Old Name`: Original filename
-- `New Name`: Sanitized filename
-- `Issues`: Violations detected
-- `Path`: Parent directory path
-- `Path Length`: Full path length (bytes)
-- `Status`: LOGGED, RENAMED, FAILED, COLLISION, SKIPPED
+**Q: What's the difference between exfat and universal mode?**  
+A: `exfat` applies exFAT-specific rules. `universal` applies the most restrictive rules for maximum compatibility with all filesystems.
 
-### Tree CSV (`tree_FILESYSTEM_TIMESTAMP.csv`)
+**Q: How do I handle 56 path length issues found?**  
+A: Review the CSV file, identify files with "Path too long" issues, and manually shorten directory or file names before running the script.
 
-Complete directory structure export (semicolon-delimited for Excel):
+## 📧 Support
 
-```csv
-Level;Depth;Type;Name;Full_Path;Size_Bytes;Modified_Date
-0;0;Directory;"Music";"/";-;2026-01-03 21:39:06
-1;1;Directory;"Album";"/Album";-;2025-12-28 14:22:15
-2;2;File;"01 Track.wav";"/Album/01 Track.wav";85234912;2025-12-28 14:20:33
-```
+- **Issues**: [GitHub Issues](https://github.com/fbaldassarri/exfat-sanitizer/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/fbaldassarri/exfat-sanitizer/discussions)
 
-**Columns:**
-- `Level`: Sequential entry number
-- `Depth`: Directory nesting level
-- `Type`: Directory or File
-- `Name`: Item filename
-- `Full_Path`: Relative path from target
-- `Size_Bytes`: File size or "-" for directories
-- `Modified_Date`: Last modification timestamp
+## 🌟 Acknowledgments
 
-## Character Restrictions
-
-### Universal (Both filesystems)
-
-These characters are forbidden in ALL filenames:
-
-```
-< > : " / \ | ? *
-```
-
-**Examples of automatic replacement:**
-- `song<artist>.mp3` → `song_artist_.mp3`
-- `"quote".txt` → `_quote_.txt`
-- `folder/subfolder` → `folder_subfolder`
-
-### FAT32-Specific
-
-Additional restrictions for FAT32 compatibility:
-
-```
-; = + [ ] ÷ ×
-```
-
-**Examples:**
-- `album[disc1].mp3` → `album_disc1_.mp3`
-- `equation=solution.txt` → `equation_solution.txt`
-- `math÷symbols.doc` → `math_symbols.doc`
-
-### exFAT
-
-exFAT is more permissive and allows:
-- `[ ] ; = + ÷ ×`
-- Long filenames (up to 255 characters)
-- Extended Unicode support
-
-## System File Protection
-
-These files are NEVER modified (safe list):
-
-```
-.DS_Store          (macOS metadata)
-Thumbs.db          (Windows thumbnails)
-.stignore          (Syncthing ignore)
-.stfolder          (Syncthing marker)
-.sync              (Sync markers)
-.sync.ffs_db       (FreeFileSync database)
-.gitignore         (Git ignore)
-```
-
-## Path Length Validation
-
-### FAT32 Mode
-- **Maximum path length**: 255 characters (including full path)
-- Files exceeding limit are skipped with warning
-- Path length reported in CSV for verification
-
-### exFAT Mode
-- **Maximum path length**: 32,767 characters
-- Most real-world paths pass validation
-- Path length still tracked for documentation
-
-## Collision Detection
-
-The script prevents naming conflicts:
-
-```bash
-# Before sanitization (same after):
-song[1].mp3
-song_1_.mp3
-
-# Script detects this would create "song_1_.mp3" twice
-# Second occurrence is marked as COLLISION and skipped
-```
-
-## Advanced Usage
-
-### Automation with Cron
-
-```bash
-# Add to crontab -e
-0 2 * * * DRY_RUN=false FILESYSTEM=fat32 /usr/local/bin/exfat-sanitizer ~/Backups >> ~/sanitizer.log 2>&1
-```
-
-### Docker Usage
-
-```dockerfile
-FROM alpine:latest
-RUN apk add bash coreutils findutils
-
-COPY exfat-sanitizer-v7.6.0.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/exfat-sanitizer-v7.6.0.sh
-
-ENTRYPOINT ["exfat-sanitizer-v7.6.0.sh"]
-```
-
-### Integration with Backup Scripts
-
-```bash
-#!/bin/bash
-# Sanitize before backup
-
-BACKUP_DIR="/mnt/backup"
-SOURCE_DIR="/home/user/media"
-
-# Sanitize with FAT32 compatibility
-DRY_RUN=false FILESYSTEM=fat32 exfat-sanitizer "$SOURCE_DIR"
-
-# Verify exit code
-if [ $? -eq 0 ]; then
-    rsync -av "$SOURCE_DIR" "$BACKUP_DIR"
-else
-    echo "Sanitization failed" >&2
-    exit 1
-fi
-```
-
-### Monitoring Multiple Directories
-
-```bash
-#!/bin/bash
-WATCH_LIST=(
-    ~/Documents
-    ~/Pictures
-    ~/Downloads
-)
-
-for dir in "${WATCH_LIST[@]}"; do
-    echo "Processing: $dir"
-    DRY_RUN=false FILESYSTEM=fat32 exfat-sanitizer "$dir"
-done
-```
-
-## Exit Codes
-
-| Code | Meaning | Action |
-|------|---------|--------|
-| `0` | Success | Operation completed |
-| `1` | Error | Invalid filesystem or missing directory |
-| `130` | Interrupted | Script interrupted by user (Ctrl+C) |
-
-## Performance
-
-### Benchmarks (on 3,500 files, 350 directories)
-
-```
-FAT32 Mode (with sanitization):
-- Scan: ~2-3 seconds
-- Tree export: ~1 second
-- CSV generation: <500ms
-- Total dry-run: ~4 seconds
-
-exFAT Mode (no sanitization):
-- Scan: ~2-3 seconds
-- Tree export: ~1 second
-- Total dry-run: ~3 seconds
-```
-
-### Recommendations
-
-- **Small directories** (<100 items): Run interactively
-- **Medium directories** (100-10K items): Background process acceptable
-- **Large directories** (>10K items): Schedule during off-peak hours
-- **Network mounts**: Add 2-5x time overhead
-
-## Troubleshooting
-
-### Issue: "syntax error in conditional expression"
-
-**Cause**: Bash version too old or incorrect syntax
-**Solution**:
-```bash
-bash --version  # Check version (need 3.2+)
-bash ./exfat-sanitizer-v7.6.0.sh  # Run with explicit bash
-```
-
-### Issue: "Permission denied"
-
-**Cause**: Script not executable
-**Solution**:
-```bash
-chmod +x exfat-sanitizer-v7.6.0.sh
-```
-
-### Issue: Files not renamed despite `DRY_RUN=false`
-
-**Cause**: Possible collision or system file protection
-**Solution**:
-```bash
-# Check CSV log for status
-grep -i "collision\|skipped\|failed" sanitizer_*.csv
-```
-
-### Issue: Path length shows as 0
-
-**Cause**: macOS `stat` command variation
-**Solution**: Script handles this gracefully; not a critical issue
-
-### Issue: Slow performance on network drives
-
-**Cause**: Network latency
-**Solution**:
-```bash
-# Consider copying to local disk first
-cp -r /Volumes/NetworkDrive/Media ~/temp/
-./exfat-sanitizer-v7.6.0.sh ~/temp/Media
-cp -r ~/temp/Media /Volumes/NetworkDrive/
-```
-
-## Real-World Examples
-
-### Prepare music library for portable player
-
-```bash
-# Most portable audio players use FAT32
-DRY_RUN=true FILESYSTEM=fat32 GENERATE_TREE=true ./exfat-sanitizer-v7.6.0.sh ~/Music
-
-# Review tree_fat32_*.csv in Excel
-# Review proposed changes in sanitizer_fat32_*.csv
-
-# If satisfied, execute:
-DRY_RUN=false FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Music
-```
-
-### Backup before external drive migration
-
-```bash
-# Create pre-migration inventory
-GENERATE_TREE=true DRY_RUN=true FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Projects
-
-# Store tree_fat32_*.csv as documentation
-mv tree_fat32_*.csv ~/backups/project_inventory_$(date +%Y%m%d).csv
-
-# Then sanitize and backup
-DRY_RUN=false FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Projects
-rsync -av ~/Projects /Volumes/ExternalDrive/
-```
-
-### Regular maintenance with logging
-
-```bash
-#!/bin/bash
-LOG_DIR="$HOME/.sanitizer_logs"
-mkdir -p "$LOG_DIR"
-
-DRY_RUN=false FILESYSTEM=fat32 ./exfat-sanitizer-v7.6.0.sh ~/Documents
-
-# Archive outputs
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-mv sanitizer_*.csv tree_*.csv "$LOG_DIR/$TIMESTAMP/"
-```
-
-## Compatibility
-
-### Operating Systems
-
-- ✅ **macOS** 10.13+ (Tested on Big Sur, Monterey, Ventura, Sonoma)
-- ✅ **Linux** (Tested on Ubuntu 18.04+, Debian, CentOS)
-- ✅ **BSD** (OpenBSD, FreeBSD)
-- ✅ **Windows** (WSL 2, Git Bash)
-
-### Shell Compatibility
-
-- ✅ **Bash** 3.2+ (Primary)
-- ⚠️ **Zsh** (Runs but test first)
-- ❌ **Fish** (Not supported)
-- ❌ **Dash** (Not supported)
-
-### Filesystem Targets
-
-- ✅ **exFAT** (External drives, SD cards, USB)
-- ✅ **FAT32** (Older USB drives, legacy systems)
-- ✅ **APFS** (macOS native)
-- ✅ **ext4** (Linux native)
-- ✅ **NTFS** (Windows drives)
-
-## Limitations
-
-- **No undo**: Changes are permanent. Always test with dry-run first.
-- **Special permissions**: Script runs as current user; cannot change files owned by others
-- **Symlinks**: Script follows symlinks; use `-L` in find command for behavior change
-- **Case sensitivity**: On case-insensitive filesystems (macOS), `file.txt` and `FILE.TXT` are same
-- **Very deep nesting**: Scripts with 100+ directory levels may hit depth limits
-
-## Contributing
-
-Contributions welcome! Please:
-
-1. Test on macOS and at least one Linux distribution
-2. Maintain Bash 3.2+ compatibility
-3. Include test cases in PR description
-4. Follow existing code style (no external dependencies)
-
-## License
-
-MIT License - See LICENSE file for details
-
-```
-Copyright (c) 2024-2026 Fabio Baldassarri
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-```
-
-## Support & Questions
-
-### Common Questions
-
-**Q: Is my data safe?**
-A: Yes! Use `DRY_RUN=true` (default) to preview changes. No modifications occur until you set `DRY_RUN=false`.
-
-**Q: Can I run this on a live system?**
-A: Yes, but recommend testing on subset first. The script uses depth-first directory processing, which is safer.
-
-**Q: What if script interrupts during execution?**
-A: Partial renames may occur. Always backup before running with `DRY_RUN=false`.
-
-**Q: Does it work on network drives?**
-A: Yes, but performance is slower. Consider copying to local disk first for large collections.
-
-### Getting Help
-
-- Check troubleshooting section above
-- Review CSV logs for detailed information
-- Run with dry-run first to understand proposed changes
-- Check script header comments for version and feature info
-
-## Changelog
-
-### v7.6.0 (Latest)
-
-✨ **New Features:**
-- Directory tree export to CSV (`GENERATE_TREE=true`)
-- Complete file structure documentation with sizes and timestamps
-- FAT32 path length validation (255 character limit)
-- Enhanced collision detection
-
-🔧 **Improvements:**
-- Better progress reporting
-- Comprehensive CSV escaping
-- System file exclusion list expanded
-- Better error messages
-
-### v7.5.0
-
-- Fixed Bash 3.2 compatibility issues
-- Improved counter tracking in subshells
-- FAT32 path length validation
-- Collision detection system
-
-### v7.4.0 & Earlier
-
-- Core sanitization functionality
-- Multi-filesystem support
-- CSV logging system
+Developed for cross-platform audio library management and tested extensively with high-resolution audio collections (WAV 32-bit/192kHz).
 
 ---
 
-**Made with ❤️ for data integrity and filesystem compatibility**
-
-*Last updated: January 3, 2026*
+**Made with ❤️ for the audio enthusiast community**
