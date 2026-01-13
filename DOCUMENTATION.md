@@ -1,8 +1,8 @@
 # exfat-sanitizer Deep Dive Documentation
 
 **File**: `DOCUMENTATION.md`  
-**Applies To**: `exfat-sanitizer-v9.0.1.sh`  
-**Version**: 9.0.1  
+**Applies To**: `exfat-sanitizer-v9.0.2.2.sh`  
+**Version**: 9.0.2.2  
 **Status**: Production-Ready (Bugfix Release)
 
 ---
@@ -20,7 +20,7 @@ It is intended for:
 If you just want to use the tool, start with:
 - `README.md`
 - `QUICK_START_GUIDE.md`
-- Release notes `RELEASE-v9.0.1.md`
+- Release notes `RELEASE-v9.0.2.2.md`
 
 This document assumes **familiarity with bash**, filesystems, and command-line workflows.
 
@@ -240,7 +240,7 @@ fi
 - System files are *invisible* to the sanitizer
 - CSV logs include only user data
 
-This behavior was refined and solidified in v9.0.1.
+This behavior was refined and solidified in v9.0.2.2.
 
 ---
 
@@ -520,7 +520,7 @@ FILESYSTEM=exfat \
 SANITIZATION_MODE=conservative \
 CHECK_SHELL_SAFETY=false \
 DRY_RUN=true \
-./exfat-sanitizer-v9.0.1.sh /Users/username/Sync/Audio
+./exfat-sanitizer-v9.0.2.2.sh /Users/username/Sync/Audio
 ```
 
 Observations:
@@ -542,7 +542,7 @@ FILESYSTEM=universal \
 SANITIZATION_MODE=strict \
 CHECK_SHELL_SAFETY=true \
 DRY_RUN=true \
-./exfat-sanitizer-v9.0.1.sh ~/Downloads
+./exfat-sanitizer-v9.0.2.2.sh ~/Downloads
 ```
 
 ### 12.3 Pre-Backup Validation
@@ -554,7 +554,7 @@ FILESYSTEM=exfat \
 SANITIZATION_MODE=conservative \
 GENERATE_TREE=true \
 DRY_RUN=true \
-./exfat-sanitizer-v9.0.1.sh /data/archive
+./exfat-sanitizer-v9.0.2.2.sh /data/archive
 ```
 
 Use the CSV + tree output to:
@@ -609,7 +609,7 @@ Potential enhancements:
 - Undo using CSV as a source of truth
 
 ```bash
-./exfat-sanitizer-v9.0.1.sh --undo sanitizer_exfat_20260110_123456.csv
+./exfat-sanitizer-v9.0.2.2.sh --undo sanitizer_exfat_20260110_123456.csv
 ```
 
 ---
@@ -675,6 +675,6 @@ Key characteristics:
 This document provides the **deep technical context** for understanding and extending the tool. For everyday usage, refer to:
 - `README.md`
 - `QUICK_START_GUIDE.md`
-- `RELEASE-v9.0.1.md`
+- `RELEASE-v9.0.2.2.md`
 
-*Last updated: January 10, 2026 (v9.0.1)*
+*Last updated: January 10, 2026 (v9.0.2.2)*

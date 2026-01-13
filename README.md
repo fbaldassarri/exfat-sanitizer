@@ -2,7 +2,7 @@
 
 **Cross-Platform Filename Sanitizer for exFAT, FAT32, APFS, NTFS, HFS+, and Universal Compatibility**
 
-[![Version](https://img.shields.io/badge/version-9.0.1-blue.svg)](https://github.com/fbaldassarri/exfat-sanitizer/releases)
+[![Version](https://img.shields.io/badge/version-9.0.2.2-blue.svg)](https://github.com/fbaldassarri/exfat-sanitizer/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-bash-brightgreen.svg)](https://www.gnu.org/software/bash/)
 
@@ -50,13 +50,13 @@ A production-ready bash script that sanitizes filenames and directory names to e
 
 ```bash
 # Download the script
-curl -O https://raw.githubusercontent.com/fbaldassarri/exfat-sanitizer/main/exfat-sanitizer-v9.0.1.sh
+curl -O https://raw.githubusercontent.com/fbaldassarri/exfat-sanitizer/main/exfat-sanitizer-v9.0.2.2.sh
 
 # Make it executable
-chmod +x exfat-sanitizer-v9.0.1.sh
+chmod +x exfat-sanitizer-v9.0.2.2.sh
 
 # Run with dry-run (safe preview)
-./exfat-sanitizer-v9.0.1.sh /path/to/your/files
+./exfat-sanitizer-v9.0.2.2.sh /path/to/your/files
 ```
 
 ### Clone Repository
@@ -64,7 +64,7 @@ chmod +x exfat-sanitizer-v9.0.1.sh
 ```bash
 git clone https://github.com/fbaldassarri/exfat-sanitizer.git
 cd exfat-sanitizer
-chmod +x exfat-sanitizer-v9.0.1.sh
+chmod +x exfat-sanitizer-v9.0.2.2.sh
 ```
 
 ## 🎯 Usage
@@ -73,7 +73,7 @@ chmod +x exfat-sanitizer-v9.0.1.sh
 
 ```bash
 FILESYSTEM=<filesystem> SANITIZATION_MODE=<mode> DRY_RUN=<true|false> \
-  ./exfat-sanitizer-v9.0.1.sh <directory>
+  ./exfat-sanitizer-v9.0.2.2.sh <directory>
 ```
 
 ### Common Use Cases
@@ -82,43 +82,43 @@ FILESYSTEM=<filesystem> SANITIZATION_MODE=<mode> DRY_RUN=<true|false> \
 ```bash
 # Preview changes first (dry run)
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
+  ./exfat-sanitizer-v9.0.2.2.sh /Users/username/Music
 
 # Apply changes after reviewing
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
+  ./exfat-sanitizer-v9.0.2.2.sh /Users/username/Music
 ```
 
 #### 2. **Clean FAT32 Drive (Legacy Compatibility)**
 ```bash
 FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh /Volumes/USB_DRIVE
+  ./exfat-sanitizer-v9.0.2.2.sh /Volumes/USB_DRIVE
 ```
 
 #### 3. **Optimize for macOS APFS**
 ```bash
 FILESYSTEM=apfs SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Documents
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 ```
 
 #### 4. **Maximum Security (Untrusted Sources)**
 ```bash
 FILESYSTEM=universal SANITIZATION_MODE=strict \
   CHECK_SHELL_SAFETY=true DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Downloads
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Downloads
 ```
 
 #### 5. **Generate Directory Tree Report**
 ```bash
 FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/directory
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/directory
 ```
 
 #### 6. **Copy to New Destination with Sanitization**
 ```bash
 FILESYSTEM=exfat COPY_TO=/Volumes/Backup \
   COPY_BEHAVIOR=version DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh /Users/username/Music
+  ./exfat-sanitizer-v9.0.2.2.sh /Users/username/Music
 ```
 
 ## ⚙️ Configuration Options
@@ -245,7 +245,7 @@ The following system files are **never processed** and **will not appear in CSV 
 **Issue: "Permission denied" errors**
 ```bash
 # Solution: Run with appropriate permissions
-sudo ./exfat-sanitizer-v9.0.1.sh /path/to/directory
+sudo ./exfat-sanitizer-v9.0.2.2.sh /path/to/directory
 ```
 
 **Issue: "Insufficient disk space" in copy mode**
@@ -269,12 +269,12 @@ df -h /destination/path
 ### Debug Mode
 ```bash
 # Enable bash debug output
-bash -x ./exfat-sanitizer-v9.0.1.sh /path/to/directory 2>&1 | tee debug.log
+bash -x ./exfat-sanitizer-v9.0.2.2.sh /path/to/directory 2>&1 | tee debug.log
 ```
 
 ## 🔄 Version History
 
-### v9.0.1 (2026-01-09)
+### v9.0.2.2 (2026-01-09)
 - **Bugfix**: System file filtering now properly excludes `.DS_Store`, `Thumbs.db`, etc.
 - **Enhancement**: System files no longer appear in CSV output
 - **Improvement**: Cleaner console output without system file processing messages
@@ -320,22 +320,22 @@ Contributions are welcome! Please:
 # Recommended: Conservative mode for music collections
 FILESYSTEM=exfat SANITIZATION_MODE=conservative \
   CHECK_SHELL_SAFETY=false DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ### For Maximum Compatibility
 ```bash
 # Use universal mode when targeting unknown destinations
 FILESYSTEM=universal SANITIZATION_MODE=strict \
-  DRY_RUN=false ./exfat-sanitizer-v9.0.1.sh /path/to/files
+  DRY_RUN=false ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 ```
 
 ### For Safe Testing
 ```bash
 # Always run dry run first, then review CSV output
-FILESYSTEM=exfat DRY_RUN=true ./exfat-sanitizer-v9.0.1.sh ~/Documents
+FILESYSTEM=exfat DRY_RUN=true ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 # Review: sanitizer_exfat_YYYYMMDD_HHMMSS.csv
-# Apply: DRY_RUN=false ./exfat-sanitizer-v9.0.1.sh ~/Documents
+# Apply: DRY_RUN=false ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 ```
 
 ## 🔗 Resources

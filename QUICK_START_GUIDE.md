@@ -24,13 +24,13 @@
 
 ```bash
 # Download the script
-curl -O https://github.com/yourusername/exfat-sanitizer/releases/download/v9.0.1/exfat-sanitizer-v9.0.1.sh
+curl -O https://github.com/yourusername/exfat-sanitizer/releases/download/v9.0.2.2/exfat-sanitizer-v9.0.2.2.sh
 
 # Make it executable
-chmod +x exfat-sanitizer-v9.0.1.sh
+chmod +x exfat-sanitizer-v9.0.2.2.sh
 
 # Verify it works
-./exfat-sanitizer-v9.0.1.sh --help
+./exfat-sanitizer-v9.0.2.2.sh --help
 ```
 
 **Expected Output**: You should see the help text with configuration options.
@@ -40,7 +40,7 @@ chmod +x exfat-sanitizer-v9.0.1.sh
 ```bash
 # Test with your files (safe - no changes made)
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/your/files
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/your/files
 ```
 
 **What to Replace**:
@@ -50,7 +50,7 @@ FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
 **What You'll See**:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-exfat-sanitizer v9.0.1
+exfat-sanitizer v9.0.2.2
 Filesystem: exfat
 Sanitization Mode: conservative
 Dry Run: true
@@ -96,7 +96,7 @@ File,Song <Bad>.wav,Song _Bad_.wav,Universal_Forbidden,,/path/to/music,152,RENAM
 **If happy with changes**:
 ```bash
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/your/files
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/your/files
 ```
 
 **If you want to make changes**:
@@ -115,14 +115,14 @@ Edit the problematic files manually, then run the script again.
 ```bash
 # Step 1: Preview what needs to change
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 
 # Step 2: Review the CSV file created
 open sanitizer_exfat_*.csv
 
 # Step 3: If happy, apply changes
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 
 # Step 4: Copy to USB
 cp -r ~/Music /Volumes/USB_DRIVE/
@@ -137,13 +137,13 @@ cp -r ~/Music /Volumes/USB_DRIVE/
 ```bash
 # Use "universal" mode for maximum compatibility
 FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Documents
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 
 # Review results...
 
 # Apply if good
 FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Documents
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 ```
 
 **Key Difference**: `universal` mode applies most restrictive rules (works everywhere)
@@ -156,12 +156,12 @@ FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=false \
 # Maximum safety - strict mode, with shell safety
 FILESYSTEM=universal SANITIZATION_MODE=strict \
   CHECK_SHELL_SAFETY=true DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Downloads
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Downloads
 
 # Apply when ready
 FILESYSTEM=universal SANITIZATION_MODE=strict \
   CHECK_SHELL_SAFETY=true DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Downloads
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Downloads
 ```
 
 ### Scenario 4: Legacy USB Drive (FAT32)
@@ -171,7 +171,7 @@ FILESYSTEM=universal SANITIZATION_MODE=strict \
 ```bash
 # Older USB drives use FAT32, more restrictions
 FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ---
@@ -287,10 +287,10 @@ $ ` & ; #             ← These can cause security problems
 
 ```bash
 # Solution 1: Run with elevated permissions
-sudo ./exfat-sanitizer-v9.0.1.sh /path/to/files
+sudo ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 
 # Solution 2: Make sure script is executable
-chmod +x exfat-sanitizer-v9.0.1.sh
+chmod +x exfat-sanitizer-v9.0.2.2.sh
 ```
 
 ### Problem: "No such file or directory"
@@ -312,7 +312,7 @@ echo "Current setting: $DRY_RUN"
 # Should output: Current setting: true
 
 # To actually apply changes:
-DRY_RUN=false ./exfat-sanitizer-v9.0.1.sh /path/to/files
+DRY_RUN=false ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 ```
 
 ### Problem: CSV shows nothing
@@ -333,7 +333,7 @@ df -h /path/to/files
 
 # Use copy mode to backup elsewhere
 COPY_TO=/external/drive DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/files
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 ```
 
 ---
@@ -351,7 +351,7 @@ pwd  # Verify path
 ### Step 2: Preview changes (SAFE)
 ```bash
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ### Step 3: Check the CSV output
@@ -375,13 +375,13 @@ mv "Artist Name - Really Long Album Title 2025" "Artist - Album 2025"
 
 # Re-run to verify
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ### Step 6: Apply changes
 ```bash
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ### Step 7: Verify changes applied
@@ -409,13 +409,13 @@ cp -r ~/Music /Volumes/USB_DRIVE/
 ### Example Commands
 ```bash
 # See all help options
-./exfat-sanitizer-v9.0.1.sh --help
+./exfat-sanitizer-v9.0.2.2.sh --help
 
 # Run with debug output
-bash -x ./exfat-sanitizer-v9.0.1.sh /path 2>&1 | head -50
+bash -x ./exfat-sanitizer-v9.0.2.2.sh /path 2>&1 | head -50
 
 # Generate tree visualization
-GENERATE_TREE=true ./exfat-sanitizer-v9.0.1.sh /path
+GENERATE_TREE=true ./exfat-sanitizer-v9.0.2.2.sh /path
 ```
 
 ---
@@ -429,14 +429,14 @@ cp -r ~/Music ~/Music_Backup
 
 # Then test on backup
 FILESYSTEM=exfat DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music_Backup
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music_Backup
 ```
 
 ### Tip 2: Use Tree Export
 ```bash
 # See directory structure before and after
 GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/files
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 # Creates: tree_exfat_*.csv with directory structure
 ```
 
@@ -446,7 +446,7 @@ GENERATE_TREE=true DRY_RUN=true \
 cat > ~/sanitize-music.sh << 'EOF'
 #!/bin/bash
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ~/exfat-sanitizer-v9.0.1.sh ~/Music
+  ~/exfat-sanitizer-v9.0.2.2.sh ~/Music
 echo "Sanitization complete on $(date)" >> ~/Music_Cleanup.log
 EOF
 
@@ -460,7 +460,7 @@ chmod +x ~/sanitize-music.sh
 mkdir -p ~/Sanitizer_Logs
 cd ~/Sanitizer_Logs
 FILESYSTEM=exfat DRY_RUN=false \
-  ~/exfat-sanitizer-v9.0.1.sh ~/Music
+  ~/exfat-sanitizer-v9.0.2.2.sh ~/Music
 # CSV files stay here for future reference
 ```
 
@@ -468,7 +468,7 @@ FILESYSTEM=exfat DRY_RUN=false \
 ```bash
 # Run before major sync operations
 FILESYSTEM=exfat DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 
 # Review CSV, then sync
 rsync -av ~/Music /Volumes/USB_DRIVE/
@@ -517,24 +517,24 @@ rsync -av ~/Music /Volumes/USB_DRIVE/
 ```bash
 # Most common (audio library for USB)
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 
 # Maximum compatibility (Mac ↔ Windows)
 FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Documents
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Documents
 
 # Maximum safety (untrusted files)
 FILESYSTEM=universal SANITIZATION_MODE=strict \
   CHECK_SHELL_SAFETY=true DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Downloads
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Downloads
 
 # With directory tree export
 FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh /path/to/files
+  ./exfat-sanitizer-v9.0.2.2.sh /path/to/files
 
 # Copy mode (backup with cleaning)
 FILESYSTEM=exfat COPY_TO=~/Music_Cleaned DRY_RUN=true \
-  ./exfat-sanitizer-v9.0.1.sh ~/Music
+  ./exfat-sanitizer-v9.0.2.2.sh ~/Music
 ```
 
 ---
@@ -571,5 +571,5 @@ Start with the **Quick Start (5 Minutes)** section above, and you'll be sanitizi
 ---
 
 *Last Updated: January 10, 2026*  
-*Version: 9.0.1*  
+*Version: 9.0.2.2*  
 *For detailed info, see README.md*
