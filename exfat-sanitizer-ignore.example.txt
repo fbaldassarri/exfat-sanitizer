@@ -1,0 +1,42 @@
+# exfat-sanitizer Ignore Patterns
+# Format: .gitignore-style glob patterns (one per line)
+# Comments: Lines starting with #
+# Directories: Append / (e.g., .git/)
+# Wildcards: * matches anything, ** matches recursively
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.AppleDB
+.LSOverride
+.TemporaryItems
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
+
+# Syncthing
+.stfolder
+.stignore
+
+# FreeFileSync
+.sync.ffs_db
+.sync.ffsdb
+
+# System/indexing
+.Spotlight-V100
+.metadata
+
+# Version control (if you want to exclude)
+# .git/
+# .gitignore
+# .hg/
+# .svn/
+
+# IDE/Editor files (optional - uncomment if needed)
+# .vscode/
+# .idea/
+# *.swp
+# *~
+
+# Add your custom patterns below:

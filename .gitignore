@@ -1,0 +1,58 @@
+# CSV output files
+sanitizer_*.csv
+tree_*.csv
+
+# Log files
+*.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+.fuse_hidden*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# Test directories
+test-output/
+tmp/
+temp/
+
+# User-specific ignore file
+.exfat-sanitizer-ignore
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# OS generated files
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Icon?
+
+# Backup files
+*.orig
+*.rej
