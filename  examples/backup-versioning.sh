@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# backup-with-versioning.sh
+# backup-versioning.sh
 # Example: Backup with automatic versioning
-#
+
 # Use case: Creating backups with smart conflict resolution
 # Features: Creates versioned copies (file-v1.ext, file-v2.ext) on conflicts
 # Best for: Incremental backups, version control, testing
@@ -31,10 +31,15 @@ echo "Backing up with automatic versioning..."
 echo "Source: $SOURCE_DIR"
 echo "Destination: $COPY_TO"
 echo ""
+echo "v12.1.2 improvements:"
+echo " ✅ Accents preserved (Loïc, Révérence, Café)"
+echo " ✅ Curly apostrophes normalized safely"
+echo " ✅ No UTF-8 corruption"
+echo ""
 echo "Versioning behavior:"
-echo "  • First run: song.mp3 → $COPY_TO/song.mp3"
-echo "  • Second run: song.mp3 → $COPY_TO/song-v1.mp3"
-echo "  • Third run: song.mp3 → $COPY_TO/song-v2.mp3"
+echo " • First run: song.mp3 → $COPY_TO/song.mp3"
+echo " • Second run: song.mp3 → $COPY_TO/song-v1.mp3"
+echo " • Third run: song.mp3 → $COPY_TO/song-v2.mp3"
 echo ""
 
 FILESYSTEM=$FILESYSTEM \
@@ -42,7 +47,7 @@ SANITIZATION_MODE=$SANITIZATION_MODE \
 COPY_TO="$COPY_TO" \
 COPY_BEHAVIOR=$COPY_BEHAVIOR \
 DRY_RUN=$DRY_RUN \
-./exfat-sanitizer-v11.1.0.sh "$SOURCE_DIR"
+./exfat-sanitizer-v12.1.2.sh "$SOURCE_DIR"
 
 echo ""
 echo "✅ Backup complete with versioning"
