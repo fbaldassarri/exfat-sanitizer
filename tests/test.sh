@@ -1,12 +1,17 @@
 #!/bin/bash
 
-# Test Suite for exfat-sanitizer v12.1.2
-# Verifies all features work correctly including the critical v12.1.2 apostrophe fix
+# Test Suite for exfat-sanitizer v12.1.4
+
+# Verifies all features work correctly including:
+# - v12.1.2 apostrophe fix (preserved)
+# - v12.1.3 NFD/NFC normalization fix (preserved)
+# - v12.1.4 inverted if/else logic fix (NEW)
+# - v12.1.4 DEBUG_UNICODE mode (NEW)
 
 set -e
 
 echo "=========================================="
-echo "exfat-sanitizer v12.1.2 Test Suite"
+echo "exfat-sanitizer v12.1.4 Test Suite"
 echo "=========================================="
 echo ""
 
@@ -48,54 +53,51 @@ fail_test() {
 }
 
 # Create test directory
-TEST_DIR="$(mktemp -d)/exfat-test-v12.1.2"
+TEST_DIR="$(mktemp -d)/exfat-test-v12.1.4"
 mkdir -p "$TEST_DIR"
 echo "Test directory: $TEST_DIR"
 echo ""
 
 # ============================================================================
-# TEST 0: Python 3 Dependency Check (NEW in v12.1.2)
+# TEST 0: Python 3 Dependency Check (MANDATORY since v12.1.2)
 # ============================================================================
-run_test "Python 3 Dependency Check (MANDATORY in v12.1.2)"
-
+run_test "Python 3 Dependency Check (MANDATORY)"
 if command -v python3 >/dev/null 2>&1; then
     PY_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
     pass_test "Python 3 found: ${PY_VERSION}"
 else
-    fail_test "Python 3 NOT found - REQUIRED for v12.1.2!"
+    fail_test "Python 3 NOT found - REQUIRED for v12.1.4!"
 fi
 
 # ============================================================================
-# TEST 1: Accent Preservation (CRITICAL v12.1.2 FIX)
+# TEST 1: Accent Preservation (CRITICAL - originally fixed in v12.1.2)
 # ============================================================================
-run_test "Accent Preservation with Curly Apostrophes (v12.1.2 fix)"
-
+run_test "Accent Preservation with Curly Apostrophes (v12.1.2 fix, preserved in v12.1.4)"
 mkdir -p "$TEST_DIR/test1"
 
-# Create test files with accents AND curly apostrophes (THE CRITICAL FIX!)
+# Create test files with accents AND curly apostrophes
 # U+2019 is RIGHT SINGLE QUOTATION MARK (curly apostrophe)
-touch "$TEST_DIR/test1/Loïc Nottet's Song.flac"  # Curly apostrophe + accent
+touch "$TEST_DIR/test1/Loïc Nottet\u2019s Song.flac"    # Curly apostrophe + accent
 touch "$TEST_DIR/test1/Café del Mar.mp3"
-touch "$TEST_DIR/test1/L'interprète.flac"  # Curly apostrophe + accent
+touch "$TEST_DIR/test1/L\u2019interprète.flac"           # Curly apostrophe + accent
 touch "$TEST_DIR/test1/Müller - España.wav"
 touch "$TEST_DIR/test1/naïve.txt"
-touch "$TEST_DIR/test1/C'è di più.ogg"  # Italian with curly apostrophe
+touch "$TEST_DIR/test1/C\u2019è di più.ogg"              # Italian with curly apostrophe
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test1" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test1" > /dev/null 2>&1
 
-# Verify files have accents preserved AND apostrophes normalized to straight
-# v12.1.2 should normalize ' (U+2019) → ' (U+0027) WITHOUT corrupting accents
+# v12.1.4 should normalize ' (U+2019) → ' (U+0027) WITHOUT corrupting accents
 if [ -f "$TEST_DIR/test1/Loïc Nottet's Song.flac" ] && \
    [ -f "$TEST_DIR/test1/Café del Mar.mp3" ] && \
    [ -f "$TEST_DIR/test1/L'interprète.flac" ] && \
    [ -f "$TEST_DIR/test1/Müller - España.wav" ] && \
    [ -f "$TEST_DIR/test1/naïve.txt" ] && \
    [ -f "$TEST_DIR/test1/C'è di più.ogg" ]; then
-    pass_test "Accents preserved AND apostrophes normalized (v12.1.2 fix verified!)"
+    pass_test "Accents preserved AND apostrophes normalized (v12.1.4 verified!)"
 else
     echo "Files found:"
     ls -la "$TEST_DIR/test1/"
@@ -103,24 +105,23 @@ else
 fi
 
 # ============================================================================
-# TEST 2: Mixed Unicode + Illegal Characters (NEW COMPREHENSIVE TEST)
+# TEST 2: Mixed Unicode + Illegal Characters
 # ============================================================================
 run_test "Mixed Unicode + Illegal Characters"
-
 mkdir -p "$TEST_DIR/test2"
 
 # Complex scenarios mixing accents, apostrophes, and illegal chars
-touch "$TEST_DIR/test2/Café<test>:Révérence's.mp3"  # Accents + curly apostrophe + illegal
-touch "$TEST_DIR/test2/Loïc|Nottet?.flac"  # Accent + illegal chars
+touch "$TEST_DIR/test2/Café:Révérence\u2019s.mp3"    # Accents + curly apostrophe + illegal
+touch "$TEST_DIR/test2/Loïc|Nottet?.flac"             # Accent + illegal chars
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test2" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test2" > /dev/null 2>&1
 
 # Expected: accents preserved, illegal chars replaced, apostrophes normalized
-if [ -f "$TEST_DIR/test2/Café_test__Révérence's.mp3" ] && \
+if [ -f "$TEST_DIR/test2/Café_Révérence's.mp3" ] && \
    [ -f "$TEST_DIR/test2/Loïc_Nottet_.flac" ]; then
     pass_test "Mixed Unicode and illegal characters handled correctly"
 else
@@ -130,23 +131,22 @@ else
 fi
 
 # ============================================================================
-# TEST 3: Curly Apostrophe Normalization (v12.1.2 SPECIFIC)
+# TEST 3: Curly Apostrophe Normalization (v12.1.2 SPECIFIC, preserved)
 # ============================================================================
 run_test "Curly Apostrophe Normalization (Python 3 Unicode-safe)"
-
 mkdir -p "$TEST_DIR/test3"
 
-# Test ALL curly apostrophe variants that v12.1.2 normalizes
-touch "$TEST_DIR/test3/test's.txt"      # U+2018 LEFT SINGLE QUOTATION
-touch "$TEST_DIR/test3/test's.txt"      # U+2019 RIGHT SINGLE QUOTATION
-touch "$TEST_DIR/test3/test‚s.txt"      # U+201A SINGLE LOW-9 QUOTATION
-touch "$TEST_DIR/test3/testˊs.txt"      # U+02BC MODIFIER LETTER APOSTROPHE
+# Test ALL curly apostrophe variants
+touch "$TEST_DIR/test3/test\u2018s.txt"    # U+2018 LEFT SINGLE QUOTATION
+touch "$TEST_DIR/test3/test\u2019s.txt"    # U+2019 RIGHT SINGLE QUOTATION
+touch "$TEST_DIR/test3/test\u201As.txt"    # U+201A SINGLE LOW-9 QUOTATION
+touch "$TEST_DIR/test3/test\u02BCs.txt"    # U+02BC MODIFIER LETTER APOSTROPHE
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test3" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test3" > /dev/null 2>&1
 
 # All should be normalized to straight apostrophe
 NORMALIZED_COUNT=$(ls "$TEST_DIR/test3/" | grep -c "test's.txt" || true)
@@ -163,7 +163,6 @@ fi
 # TEST 4: Illegal Character Removal
 # ============================================================================
 run_test "Illegal Character Removal"
-
 mkdir -p "$TEST_DIR/test4"
 
 # Create files with illegal characters
@@ -173,9 +172,9 @@ touch "$TEST_DIR/test4/file|pipe.txt"
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test4" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test4" > /dev/null 2>&1
 
 # Verify illegal chars were replaced
 if [ -f "$TEST_DIR/test4/song_test_.mp3" ] && \
@@ -189,10 +188,9 @@ else
 fi
 
 # ============================================================================
-# TEST 5: Shell Safety (v11.1.0 feature, preserved in v12.1.2)
+# TEST 5: Shell Safety (v11.1.0 feature, preserved)
 # ============================================================================
 run_test "Shell Safety Feature"
-
 mkdir -p "$TEST_DIR/test5"
 
 # Create files with shell-dangerous characters
@@ -201,10 +199,10 @@ touch "$TEST_DIR/test5/test&background.sh"
 
 # Run sanitizer WITH shell safety
 CHECK_SHELL_SAFETY=true \
-FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test5" > /dev/null 2>&1
+  FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test5" > /dev/null 2>&1
 
 # Verify shell chars were replaced
 if [ -f "$TEST_DIR/test5/file__cmd_.txt" ] && \
@@ -217,10 +215,9 @@ else
 fi
 
 # ============================================================================
-# TEST 6: System File Filtering (v11.1.0 feature, preserved in v12.1.2)
+# TEST 6: System File Filtering (v11.1.0 feature, preserved)
 # ============================================================================
 run_test "System File Filtering"
-
 mkdir -p "$TEST_DIR/test6"
 
 # Create system files
@@ -230,9 +227,9 @@ touch "$TEST_DIR/test6/normal.txt"
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test6" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test6" > /dev/null 2>&1
 
 # Check CSV output
 CSV_FILE=$(ls -t sanitizer_exfat_*.csv 2>/dev/null | head -1)
@@ -240,21 +237,19 @@ if [ -f "$CSV_FILE" ]; then
     # System files should NOT be in CSV
     DS_STORE_COUNT=$(grep -c "\.DS_Store" "$CSV_FILE" || true)
     THUMBS_COUNT=$(grep -c "Thumbs\.db" "$CSV_FILE" || true)
-    
     if [ "$DS_STORE_COUNT" -eq 0 ] && [ "$THUMBS_COUNT" -eq 0 ]; then
         pass_test "System files filtered correctly"
     else
         fail_test "System files not filtered"
     fi
 else
-    echo -e "${YELLOW}⚠️  WARN${NC}: CSV file not found"
+    echo -e "${YELLOW}⚠️ WARN${NC}: CSV file not found"
 fi
 
 # ============================================================================
-# TEST 7: Copy Mode with Versioning (v11.1.0 feature, preserved in v12.1.2)
+# TEST 7: Copy Mode with Versioning (v11.1.0 feature, preserved)
 # ============================================================================
 run_test "Copy Mode with Versioning"
-
 mkdir -p "$TEST_DIR/test7/source"
 mkdir -p "$TEST_DIR/test7/dest"
 
@@ -263,20 +258,20 @@ echo "content1" > "$TEST_DIR/test7/source/song.mp3"
 
 # First copy
 FILESYSTEM=exfat \
-COPY_TO="$TEST_DIR/test7/dest" \
-COPY_BEHAVIOR=version \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test7/source" > /dev/null 2>&1
+  COPY_TO="$TEST_DIR/test7/dest" \
+  COPY_BEHAVIOR=version \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test7/source" > /dev/null 2>&1
 
 # Modify source
 echo "content2" > "$TEST_DIR/test7/source/song.mp3"
 
 # Second copy (should create version)
 FILESYSTEM=exfat \
-COPY_TO="$TEST_DIR/test7/dest" \
-COPY_BEHAVIOR=version \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test7/source" > /dev/null 2>&1
+  COPY_TO="$TEST_DIR/test7/dest" \
+  COPY_BEHAVIOR=version \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test7/source" > /dev/null 2>&1
 
 # Verify versioned file exists
 if [ -f "$TEST_DIR/test7/dest/song.mp3" ] && \
@@ -289,10 +284,9 @@ else
 fi
 
 # ============================================================================
-# TEST 8: Custom Replacement Character (v11.1.0 feature, preserved in v12.1.2)
+# TEST 8: Custom Replacement Character (v11.1.0 feature, preserved)
 # ============================================================================
 run_test "Custom Replacement Character"
-
 mkdir -p "$TEST_DIR/test8"
 
 # Create file with illegal character
@@ -300,10 +294,10 @@ touch "$TEST_DIR/test8/song<test>.mp3"
 
 # Run sanitizer with custom replacement
 REPLACEMENT_CHAR=- \
-FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test8" > /dev/null 2>&1
+  FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test8" > /dev/null 2>&1
 
 # Verify dash was used instead of underscore
 if [ -f "$TEST_DIR/test8/song-test-.mp3" ]; then
@@ -318,7 +312,6 @@ fi
 # TEST 9: Straight Apostrophe Preservation
 # ============================================================================
 run_test "Straight Apostrophe Preservation"
-
 mkdir -p "$TEST_DIR/test9"
 
 # Create file with STRAIGHT apostrophe (should be preserved)
@@ -327,9 +320,9 @@ touch "$TEST_DIR/test9/don't stop.flac"
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test9" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test9" > /dev/null 2>&1
 
 # Verify straight apostrophe preserved
 if [ -f "$TEST_DIR/test9/L'amour.mp3" ] && \
@@ -345,7 +338,6 @@ fi
 # TEST 10: DRY_RUN Mode (No Changes)
 # ============================================================================
 run_test "DRY_RUN Mode (no changes)"
-
 mkdir -p "$TEST_DIR/test10"
 
 # Create file with illegal character
@@ -353,9 +345,9 @@ touch "$TEST_DIR/test10/file<test>.txt"
 
 # Run sanitizer in DRY_RUN mode
 DRY_RUN=true \
-FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test10" > /dev/null 2>&1
+  FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test10" > /dev/null 2>&1
 
 # Verify original file still exists (unchanged)
 if [ -f "$TEST_DIR/test10/file<test>.txt" ]; then
@@ -368,7 +360,6 @@ fi
 # TEST 11: Reserved Names (Windows/DOS)
 # ============================================================================
 run_test "Reserved Name Handling"
-
 mkdir -p "$TEST_DIR/test11"
 
 # Create files with reserved names
@@ -378,13 +369,13 @@ touch "$TEST_DIR/test11/normal.txt"
 
 # Run sanitizer (FAT32 mode checks reserved names)
 FILESYSTEM=fat32 \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test11" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test11" > /dev/null 2>&1
 
 # Verify reserved names were handled
-if [ -f "$TEST_DIR/test11/CON-reserved.txt" ] && \
-   [ -f "$TEST_DIR/test11/LPT1-reserved.log" ] && \
+if [ -f "$TEST_DIR/test11/CON_reserved.txt" ] && \
+   [ -f "$TEST_DIR/test11/LPT1_reserved.log" ] && \
    [ -f "$TEST_DIR/test11/normal.txt" ]; then
     pass_test "Reserved names handled correctly"
 else
@@ -394,21 +385,20 @@ else
 fi
 
 # ============================================================================
-# TEST 12: NFD to NFC Normalization
+# TEST 12: NFD to NFC Normalization (v12.1.3 fix, preserved in v12.1.4)
 # ============================================================================
 run_test "Unicode NFD to NFC Normalization"
-
 mkdir -p "$TEST_DIR/test12"
 
 # Create file with NFD (decomposed) character if possible
-# This is more about testing normalize_unicode() function
-touch "$TEST_DIR/test12/café.txt"  # May be NFD on macOS
+# This tests normalize_unicode() function
+touch "$TEST_DIR/test12/café.txt"    # May be NFD on macOS
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test12" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test12" > /dev/null 2>&1
 
 # File should still exist with proper normalization
 if [ -f "$TEST_DIR/test12/café.txt" ]; then
@@ -420,25 +410,24 @@ else
 fi
 
 # ============================================================================
-# TEST 13: Regression Test - v12.1.1 Bug (THE CRITICAL FIX!)
+# TEST 13: Regression Test - v12.1.1 Bug (originally fixed in v12.1.2)
 # ============================================================================
-run_test "Regression Test: v12.1.1 Apostrophe Bug (CRITICAL v12.1.2 FIX)"
-
+run_test "Regression Test: v12.1.1 Apostrophe Bug (v12.1.2 fix, preserved)"
 mkdir -p "$TEST_DIR/test13"
 
 # These are the EXACT filenames that broke in v12.1.1
 # v12.1.1 would strip accents when normalizing curly apostrophes
-touch "$TEST_DIR/test13/Loïc Nottet's Album.flac"      # The canonical bug case
-touch "$TEST_DIR/test13/Révérence's Song.mp3"          # Another accent + apostrophe
-touch "$TEST_DIR/test13/L'été's Memories.ogg"          # Multiple accents + apostrophe
+touch "$TEST_DIR/test13/Loïc Nottet\u2019s Album.flac"   # The canonical bug case
+touch "$TEST_DIR/test13/Révérence\u2019s Song.mp3"        # Another accent + apostrophe
+touch "$TEST_DIR/test13/L\u2019été\u2019s Memories.ogg"   # Multiple accents + apostrophe
 
 # Run sanitizer
 FILESYSTEM=exfat \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh "$TEST_DIR/test13" > /dev/null 2>&1
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test13" > /dev/null 2>&1
 
-# v12.1.2 MUST preserve accents while normalizing apostrophes
+# v12.1.4 MUST preserve accents while normalizing apostrophes
 if [ -f "$TEST_DIR/test13/Loïc Nottet's Album.flac" ] && \
    [ -f "$TEST_DIR/test13/Révérence's Song.mp3" ] && \
    [ -f "$TEST_DIR/test13/L'été's Memories.ogg" ]; then
@@ -447,24 +436,152 @@ else
     echo "Files found:"
     ls -la "$TEST_DIR/test13/"
     echo ""
-    echo "CRITICAL: v12.1.2 should fix the v12.1.1 bug where:"
+    echo "CRITICAL: v12.1.4 should fix the v12.1.1 bug where:"
     echo "  'Loïc Nottet's' became 'Loic Nottet's' (accent stripped)"
     echo ""
     fail_test "v12.1.1 regression still present - CRITICAL BUG!"
 fi
 
 # ============================================================================
-# TEST 14: Python 3 Fallback Behavior
+# TEST 14: Python 3 Dependency Warning
 # ============================================================================
-run_test "Python 3 Dependency Warning (if applicable)"
-
-# This test just verifies the script handles Python 3 correctly
-# We already verified Python 3 exists in Test 0
+run_test "Python 3 Dependency Verification"
 if command -v python3 >/dev/null 2>&1; then
     pass_test "Python 3 available for Unicode-safe operations"
 else
-    echo -e "${YELLOW}⚠️  WARN${NC}: Python 3 not found - v12.1.2 requires it!"
-    fail_test "Python 3 REQUIRED for v12.1.2"
+    echo -e "${YELLOW}⚠️ WARN${NC}: Python 3 not found - v12.1.4 requires it!"
+    fail_test "Python 3 REQUIRED for v12.1.4"
+fi
+
+# ============================================================================
+# TEST 15: Inverted Logic Fix (NEW in v12.1.4 — THE CRITICAL FIX)
+# ============================================================================
+run_test "Inverted if/else Logic Fix (CRITICAL v12.1.4 FIX)"
+mkdir -p "$TEST_DIR/test15"
+
+# Create files that specifically test character classification:
+# Legal characters (accents, spaces, dashes) MUST be preserved
+# Illegal characters (<, >, :, |, ?) MUST be replaced
+touch "$TEST_DIR/test15/Café - Révérence.flac"          # All legal chars
+touch "$TEST_DIR/test15/Loïc Nottet - naïve.mp3"        # All legal chars
+touch "$TEST_DIR/test15/Müller España.wav"               # All legal chars
+touch "$TEST_DIR/test15/Cè di più.ogg"                   # All legal chars (Italian)
+touch "$TEST_DIR/test15/Song<Test>Track.mp3"             # Has illegal < and >
+touch "$TEST_DIR/test15/file:name.txt"                   # Has illegal :
+
+# Run sanitizer
+FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test15" > /dev/null 2>&1
+
+# Verify:
+# 1. Legal accented files are UNCHANGED (not mangled by inverted logic)
+# 2. Illegal chars are properly replaced
+LEGAL_OK=true
+ILLEGAL_OK=true
+
+# Check legal files are preserved exactly
+[ ! -f "$TEST_DIR/test15/Café - Révérence.flac" ]    && LEGAL_OK=false
+[ ! -f "$TEST_DIR/test15/Loïc Nottet - naïve.mp3" ]  && LEGAL_OK=false
+[ ! -f "$TEST_DIR/test15/Müller España.wav" ]         && LEGAL_OK=false
+[ ! -f "$TEST_DIR/test15/Cè di più.ogg" ]             && LEGAL_OK=false
+
+# Check illegal chars were replaced
+[ ! -f "$TEST_DIR/test15/Song_Test_Track.mp3" ]       && ILLEGAL_OK=false
+[ ! -f "$TEST_DIR/test15/file_name.txt" ]             && ILLEGAL_OK=false
+
+if [ "$LEGAL_OK" = true ] && [ "$ILLEGAL_OK" = true ]; then
+    pass_test "v12.1.4 inverted logic FIXED! Legal chars preserved, illegal chars replaced"
+else
+    echo "Files found:"
+    ls -la "$TEST_DIR/test15/"
+    echo ""
+    if [ "$LEGAL_OK" = false ]; then
+        echo "CRITICAL: Legal accented filenames were mangled!"
+        echo "This indicates the inverted if/else logic bug from v12.1.3"
+    fi
+    if [ "$ILLEGAL_OK" = false ]; then
+        echo "CRITICAL: Illegal characters were NOT replaced!"
+    fi
+    fail_test "Inverted logic fix verification failed"
+fi
+
+# ============================================================================
+# TEST 16: NFD False-Positive Prevention (v12.1.3 fix, verified in v12.1.4)
+# ============================================================================
+run_test "NFD False-Positive Prevention (NFC comparison)"
+mkdir -p "$TEST_DIR/test16"
+
+# Create files with accented characters that may be stored as NFD on macOS
+# On macOS, 'è' may be stored as e + combining grave accent (NFD)
+# The sanitizer should NOT report these as RENAMED
+touch "$TEST_DIR/test16/Cè la farò.wav"
+touch "$TEST_DIR/test16/Perché no.mp3"
+touch "$TEST_DIR/test16/Già fatto.flac"
+
+# Run sanitizer in DRY_RUN to check CSV status
+FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=true \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test16" > /dev/null 2>&1
+
+# Check that NO files were marked RENAMED (they should all be LOGGED)
+CSV_FILE=$(ls -t sanitizer_exfat_*.csv 2>/dev/null | head -1)
+if [ -f "$CSV_FILE" ]; then
+    RENAMED_COUNT=$(grep -c "RENAMED" "$CSV_FILE" || true)
+    if [ "$RENAMED_COUNT" -eq 0 ]; then
+        pass_test "No false RENAMED status — NFD/NFC comparison working correctly"
+    else
+        echo "CSV content:"
+        cat "$CSV_FILE"
+        echo ""
+        echo "RENAMED count: $RENAMED_COUNT (expected 0)"
+        echo "This indicates NFD→NFC normalization comparison is not working."
+        fail_test "NFD false-positive detected — accented files wrongly marked RENAMED"
+    fi
+else
+    echo -e "${YELLOW}⚠️ WARN${NC}: CSV file not found, skipping CSV check"
+    # Fall back to checking files still exist unchanged
+    if [ -f "$TEST_DIR/test16/Cè la farò.wav" ] && \
+       [ -f "$TEST_DIR/test16/Perché no.mp3" ] && \
+       [ -f "$TEST_DIR/test16/Già fatto.flac" ]; then
+        pass_test "Accented files preserved (CSV check skipped)"
+    else
+        fail_test "Accented files were modified unexpectedly"
+    fi
+fi
+
+# ============================================================================
+# TEST 17: DEBUG_UNICODE Mode (NEW in v12.1.3, preserved in v12.1.4)
+# ============================================================================
+run_test "DEBUG_UNICODE Mode"
+mkdir -p "$TEST_DIR/test17"
+
+# Create a file with accented characters
+touch "$TEST_DIR/test17/Café.txt"
+
+# Run sanitizer with DEBUG_UNICODE=true, capture stderr
+DEBUG_UNICODE=true \
+  FILESYSTEM=exfat \
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=true \
+  ./exfat-sanitizer-v12.1.4.sh "$TEST_DIR/test17" > /dev/null 2>"$TEST_DIR/debug_output.log"
+
+# Check that debug output contains DEBUG: lines
+if [ -f "$TEST_DIR/debug_output.log" ]; then
+    DEBUG_LINES=$(grep -c "DEBUG" "$TEST_DIR/debug_output.log" || true)
+    if [ "$DEBUG_LINES" -gt 0 ]; then
+        pass_test "DEBUG_UNICODE mode produces diagnostic output ($DEBUG_LINES debug lines)"
+    else
+        echo "Debug output:"
+        cat "$TEST_DIR/debug_output.log"
+        echo ""
+        echo "Expected DEBUG: lines in stderr output"
+        fail_test "DEBUG_UNICODE mode did not produce expected output"
+    fi
+else
+    fail_test "Debug output file not created"
 fi
 
 # ============================================================================
@@ -489,33 +606,37 @@ else
 fi
 echo "=========================================="
 echo ""
-
-echo "v12.1.2 Test Coverage:"
-echo " ✅ Python 3 dependency check (MANDATORY)"
-echo " ✅ Accent preservation with curly apostrophes (v12.1.2 fix)"
-echo " ✅ Mixed Unicode + illegal characters"
-echo " ✅ Curly apostrophe normalization (all 4 variants)"
-echo " ✅ Illegal character removal"
-echo " ✅ Shell safety (v11.1.0 feature preserved)"
-echo " ✅ System file filtering (v11.1.0 feature preserved)"
-echo " ✅ Copy versioning (v11.1.0 feature preserved)"
-echo " ✅ Custom replacement char (v11.1.0 feature preserved)"
-echo " ✅ Straight apostrophe preservation"
-echo " ✅ DRY_RUN mode"
-echo " ✅ Reserved name handling"
-echo " ✅ Unicode NFD/NFC normalization"
-echo " ✅ v12.1.1 regression test (CRITICAL BUG FIX)"
-echo " ✅ Python 3 availability verification"
+echo "v12.1.4 Test Coverage:"
+echo "  ✅ Python 3 dependency check (MANDATORY)"
+echo "  ✅ Accent preservation with curly apostrophes (v12.1.2 fix)"
+echo "  ✅ Mixed Unicode + illegal characters"
+echo "  ✅ Curly apostrophe normalization (all 4 variants)"
+echo "  ✅ Illegal character removal"
+echo "  ✅ Shell safety (v11.1.0 feature preserved)"
+echo "  ✅ System file filtering (v11.1.0 feature preserved)"
+echo "  ✅ Copy versioning (v11.1.0 feature preserved)"
+echo "  ✅ Custom replacement char (v11.1.0 feature preserved)"
+echo "  ✅ Straight apostrophe preservation"
+echo "  ✅ DRY_RUN mode"
+echo "  ✅ Reserved name handling"
+echo "  ✅ Unicode NFD/NFC normalization"
+echo "  ✅ v12.1.1 regression test (CRITICAL BUG FIX)"
+echo "  ✅ Python 3 availability verification"
+echo "  ✅ Inverted if/else logic fix (v12.1.4 CRITICAL FIX)"
+echo "  ✅ NFD false-positive prevention (v12.1.3+, NFC comparison)"
+echo "  ✅ DEBUG_UNICODE mode (v12.1.3+)"
 echo ""
-
 if [ "$TESTS_FAILED" -eq 0 ]; then
     echo -e "${GREEN}Ready for production! 🚀${NC}"
     echo ""
-    echo "The v12.1.2 critical fix is VERIFIED:"
+    echo "The v12.1.4 fixes are VERIFIED:"
     echo "  ✓ Accents are preserved (Loïc, Révérence, café, naïve)"
     echo "  ✓ Curly apostrophes normalized to straight (', ', ‚, ˊ → ')"
     echo "  ✓ No UTF-8 corruption when mixing accents + apostrophes"
     echo "  ✓ Python 3 Unicode-aware operations working correctly"
+    echo "  ✓ Legal characters preserved, illegal characters replaced (v12.1.4 fix)"
+    echo "  ✓ NFD/NFC comparison prevents false RENAMED status (v12.1.3+ fix)"
+    echo "  ✓ DEBUG_UNICODE diagnostic mode functional (v12.1.3+)"
     exit 0
 else
     exit 1

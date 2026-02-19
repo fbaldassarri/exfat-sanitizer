@@ -1,31 +1,32 @@
-# exfat-sanitizer Deep Dive Documentation
+# exfat-sanitizer — Deep Dive Documentation
 
-**File**: `DOCUMENTATION.md`  
-**Applies To**: `exfat-sanitizer-v12.1.2.sh`  
-**Version**: 12.1.2  
-**Repository**: https://github.com/fbaldassarri/exfat-sanitizer  
-**Status**: Production-Ready (Critical Bug Fix Release)
+| Field | Value |
+|-------|-------|
+| **File** | `DOCUMENTATION.md` |
+| **Applies To** | `exfat-sanitizer-v12.1.4.sh` |
+| **Version** | 12.1.4 |
+| **Repository** | [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer) |
+| **Status** | Production-Ready — Bug Fix Release |
 
 ---
 
 ## 1. Introduction
 
-This document provides a **deep technical and conceptual dive** into `exfat-sanitizer` v12.1.2, beyond what is covered in `README.md` and `QUICK-START-v12.1.2.md`.
+This document provides a deep technical and conceptual dive into exfat-sanitizer v12.1.4, beyond what is covered in README.md and QUICK_START_GUIDE.md. It is intended for:
 
-It is intended for:
-- Developers who want to understand or extend the script
-- Power users who want to tune behavior deeply
-- Contributors preparing pull requests
-- Future maintainers picking up the project
-- Technical auditors evaluating the tool
+- **Developers** who want to understand or extend the script
+- **Power users** who want to tune behavior deeply
+- **Contributors** preparing pull requests
+- **Future maintainers** picking up the project
+- **Technical auditors** evaluating the tool
 
 If you just want to use the tool, start with:
-- `README.md` - Overview and feature list
-- `QUICK-START-v12.1.2.md` - Getting started guide
-- `RELEASE-v12.1.2.md` - Release notes
-- `CHANGELOG-v12.1.2.md` - Version history
+1. [README.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/README.md) — Overview and feature list
+2. [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md) — Getting started guide
+3. [RELEASE-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.4.md) — Release notes
+4. [CHANGELOG-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.4.md) — Version history
 
-This document assumes **familiarity with bash**, filesystems, Unicode, and command-line workflows.
+This document assumes familiarity with bash, filesystems, Unicode, and command-line workflows.
 
 ---
 
@@ -34,21 +35,21 @@ This document assumes **familiarity with bash**, filesystems, Unicode, and comma
 ### 2.1 Problem Space
 
 Modern workflows regularly move data across:
-- macOS (APFS, HFS+)
-- Windows (NTFS, legacy FAT32)
-- Linux (ext4, xfs, btrfs, etc.)
-- Removable media (exFAT, FAT32)
-- Network shares (SMB/CIFS, NFS)
+- **macOS** — APFS, HFS+
+- **Windows** — NTFS, legacy FAT32
+- **Linux** — ext4, xfs, btrfs, etc.
+- **Removable media** — exFAT, FAT32
+- **Network shares** — SMB/CIFS, NFS
 
 Each filesystem has differing rules for:
-- **Allowed characters**: What characters are legal in filenames
-- **Unicode support**: How Unicode is stored (UTF-8, UTF-16LE, normalization)
-- **Reserved filenames**: Names with special meanings (Windows DOS names)
-- **Path length limits**: Maximum path and filename lengths
-- **Case sensitivity**: Case-preserving vs case-insensitive
+- **Allowed characters** — What characters are legal in filenames
+- **Unicode support** — How Unicode is stored (UTF-8, UTF-16LE, normalization)
+- **Reserved filenames** — Names with special meanings (Windows DOS names)
+- **Path length limits** — Maximum path and filename lengths
+- **Case sensitivity** — Case-preserving vs case-insensitive
 
-As a result, filenames that are valid in one environment may:
-- Fail to copy or sync silently
+As a result, filenames valid in one environment may:
+- Fail to copy or sync (silently)
 - Be rejected with cryptic error messages
 - Break backup tools and workflows
 - Fail in media players, DAWs, or other applications
@@ -56,58 +57,53 @@ As a result, filenames that are valid in one environment may:
 
 ### 2.2 The Unicode Challenge
 
-**v12.1.2 specifically addresses Unicode preservation:**
-
 #### FAT32/exFAT Unicode Support
 
-Modern FAT32 and exFAT support Unicode via **Long Filename (LFN)** stored as UTF-16LE:
+Modern FAT32 and exFAT support Unicode via Long Filename (LFN) stored as UTF-16LE:
+- **Short Filename (SFN):** 8.3 format, ASCII-only (legacy DOS)
+- **Long Filename (LFN):** Up to 255 characters, stored as UTF-16LE
 
-- **Short Filename (SFN)**: 8.3 format, ASCII-only (legacy DOS)
-- **Long Filename (LFN)**: Up to 255 characters, stored as UTF-16LE
+This means FAT32/exFAT **fully support** accented characters:
+- French: à, â, ç, é, è, ê, ë, ï, î, ô, ù, û
+- Italian: à, è, é, ì, ò, ù
+- Spanish: á, é, í, ó, ú, ñ, ü
+- German: ä, ö, ü, ß
+- Portuguese: ã, õ, á, é, ó, â, ê, ô
 
-This means FAT32/exFAT **fully support** accented characters like:
-- French: `è é ê ë à ù ô î ï ç ñ`
-- Italian: `à è é ì ò ù`
-- Spanish: `ñ á é í ó ú ü`
-- German: `ö ä ü ß`
-- Portuguese: `ã õ ç`
+#### NFD vs NFC Normalization (v12.1.3+ Fix)
 
-**Critical v12.1.2 Fix**: Previous versions (v12.1.1 and earlier) had a bug where apostrophe normalization corrupted multi-byte UTF-8 sequences, stripping accents. v12.1.2 uses Python-based Unicode-aware normalization to preserve all Unicode characters.
+macOS stores filenames in **NFD** (Normalized Form Decomposed) where `ò` = `o` + combining grave accent (2 code points). Windows and Linux use **NFC** (Normalized Form Composed) where `ò` = single code point. Without normalization before comparison:
+
+```
+NFD "ò" (from macOS disk) ≠ NFC "ò" (from sanitization) → FALSE POSITIVE RENAME
+```
+
+v12.1.4 normalizes both the original and sanitized names to NFC before comparison, preventing false `RENAMED` status.
+
+#### v12.1.4 Conditional Logic Fix
+
+v12.1.3 had an inverted `if/else` in `sanitize_filename()` where legal characters entered the replacement branch. v12.1.4 adds the `!` (NOT) operator to correct character classification.
 
 ### 2.3 Core Solution
 
-`exfat-sanitizer` solves cross-platform filename issues by:
+exfat-sanitizer solves cross-platform filename issues by:
 
-1. **Scanning** a directory tree recursively
-2. **Evaluating** each filename against selected filesystem rules
-3. **Preserving** Unicode/accented characters (v12.x feature)
-4. **Normalizing** apostrophes safely (v12.1.2 fix)
-5. **Sanitizing** illegal characters only (configurable strictness)
-6. **Recording** all decisions in detailed CSV logs
-7. **Optionally copying** sanitized data to new destinations with conflict resolution
+1. Scanning a directory tree recursively
+2. Evaluating each filename against selected filesystem rules
+3. Preserving Unicode/accented characters (v12.x feature)
+4. Normalizing apostrophes safely (v12.1.2 fix)
+5. Normalizing NFD→NFC for consistent comparison (v12.1.3+ fix)
+6. Classifying characters correctly via fixed conditional logic (v12.1.4 fix)
+7. Sanitizing illegal characters only (configurable strictness)
+8. Recording all decisions in detailed CSV logs
+9. Optionally copying sanitized data to new destinations with conflict resolution
 
 ### 2.4 Core Principles
 
-1. **Safety**
-   - Default to preview mode (`DRY_RUN=true`)
-   - Never delete any file or directory
-   - Provide complete audit logs (CSV)
-   - Preserve Unicode characters
-
-2. **Correctness**
-   - Filesystem-aware character rules
-   - Unicode-safe operations (Python 3 required)
-   - Explicit Unicode code point handling
-
-3. **Predictability**
-   - Same input + same options → same output
-   - Mode- and filesystem-specific behavior clearly defined
-   - Deterministic renaming logic
-
-4. **Transparency**
-   - CSV logs show what changed, why, and where
-   - Summary statistics printed to console
-   - Tree export option for structure visualization
+1. **Safety** — Default to preview mode (`DRY_RUN=true`); never delete any file; provide complete audit logs (CSV); preserve Unicode characters
+2. **Correctness** — Filesystem-aware character rules; Unicode-safe operations (Python 3 required); explicit Unicode code point handling; NFD→NFC normalization
+3. **Predictability** — Same input + same options = same output; mode- and filesystem-specific behavior clearly defined; deterministic renaming logic
+4. **Transparency** — CSV logs show what changed, why, and where; summary statistics printed to console; tree export option for structure visualization; `DEBUG_UNICODE` mode for normalization diagnostics
 
 ---
 
@@ -117,72 +113,75 @@ This means FAT32/exFAT **fully support** accented characters like:
 
 ```
 1. Initialization
-   ├─ Validate inputs (FILESYSTEM, SANITIZATION_MODE, etc.)
-   ├─ Initialize temp counters
-   ├─ Create CSV log file
-   └─ Set up trap for cleanup
+   ├── Validate inputs (FILESYSTEM, SANITIZATION_MODE, etc.)
+   ├── Check dependencies (Python 3, Perl, etc.)
+   ├── Initialize counters and temp files
+   ├── Create CSV log file
+   └── Set up trap for cleanup
 
-2. Optional Tree Generation
-   └─ Generate pre-sanitization tree snapshot
+2. Optional: Tree Generation
+   └── Generate pre-sanitization tree snapshot (tree_*.csv)
 
-3. Directory Processing (Bottom-Up)
-   ├─ Find all directories
-   ├─ Sort reverse (deepest first)
-   └─ For each directory:
-       ├─ Skip system files
-       ├─ Extract UTF-8 characters (Python 3)
-       ├─ Sanitize filename
-       ├─ Normalize apostrophes (Python 3)
-       ├─ Check path length
-       ├─ Detect collisions
-       └─ Rename (if DRY_RUN=false) or log
+3. Recursive Item Processing
+   └── For each item (directories and files):
+       ├── Skip system files (should_skip_system_file)
+       ├── Check ignore patterns (should_ignore)
+       ├── Normalize to NFC (normalize_unicode) ← v12.1.3+
+       ├── Sanitize filename (sanitize_filename)
+       │   ├── Extract UTF-8 characters (Python 3)
+       │   ├── Normalize apostrophes (Python 3)
+       │   ├── Check each character against filesystem rules
+       │   │   └── if ! is_illegal_char → PRESERVE ← v12.1.4 fix
+       │   ├── Check shell safety (optional)
+       │   ├── Check Unicode exploits (optional)
+       │   ├── Remove leading/trailing spaces and dots
+       │   └── Handle reserved names (FAT32/universal)
+       ├── Compare NFC(original) vs NFC(sanitized) ← v12.1.3+
+       ├── DEBUG_UNICODE output (optional) ← v12.1.3+
+       ├── Rename if DRY_RUN=false, or log
+       └── Copy if COPY_TO set
 
-4. File Processing (Top-Down)
-   └─ For each file:
-       ├─ Skip system files
-       ├─ Extract UTF-8 characters (Python 3)
-       ├─ Sanitize filename
-       ├─ Normalize apostrophes (Python 3)
-       ├─ Check path length
-       ├─ Detect collisions
-       ├─ Rename (if DRY_RUN=false) or log
-       └─ Copy (if COPY_TO set)
-
-5. Summary & Cleanup
-   ├─ Print statistics
-   ├─ Close CSV log
-   └─ Cleanup temp files
+4. Summary & Cleanup
+   ├── Print statistics
+   ├── Close CSV log
+   └── Cleanup temp files (trap)
 ```
 
 ### 3.2 Key Dependencies
 
 **Required:**
-- Bash 4.0+
-- Python 3.6+ (new in v12.1.2)
-- Standard Unix tools: `find`, `sed`, `grep`, `awk`, `mv`, `cp`
+- **Bash 4.0+** — associative arrays, `set -o pipefail`
+- **Python 3.6+** — UTF-8 character extraction, apostrophe normalization, Unicode normalization
+- **Standard Unix tools** — `find`, `sed`, `grep`, `awk`, `mv`, `cp`
 
-**Why Python 3 is Required (v12.1.2):**
+**Why Python 3 is required (since v12.1.2):**
 
 Two critical functions require Unicode-aware string handling:
 
-1. **`extract_utf8_chars()`**: Safely extracts UTF-8 characters from filenames
+1. `extract_utf8_chars()` — Safely extracts UTF-8 characters from filenames:
    ```python
-   # Handles multi-byte UTF-8 sequences correctly
    text = sys.stdin.read().strip()
-   print(text)  # UTF-8 safe output
+   for c in text:
+       print(c)  # Each Unicode character, not byte
    ```
 
-2. **`normalize_apostrophes()`**: Normalizes curly apostrophes without corrupting UTF-8
+2. `normalize_apostrophes()` — Normalizes curly apostrophes without corrupting UTF-8:
    ```python
-   # Uses explicit Unicode code points
    replacements = {
        '\u2018': "'",  # LEFT SINGLE QUOTATION MARK
        '\u2019': "'",  # RIGHT SINGLE QUOTATION MARK
-       # ... etc
+       '\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
+       '\u02BC': "'",  # MODIFIER LETTER APOSTROPHE
    }
    ```
 
-**Fallback Behavior**: If Python 3 is unavailable, critical functions fail gracefully, but the script cannot guarantee Unicode preservation.
+3. `normalize_unicode()` — NFD→NFC normalization:
+   ```python
+   import unicodedata
+   print(unicodedata.normalize('NFC', text))
+   ```
+
+**Fallback chain** (for `normalize_unicode`): Python 3 → uconv (ICU tools) → Perl (`Unicode::Normalize`) → iconv
 
 ---
 
@@ -190,114 +189,61 @@ Two critical functions require Unicode-aware string handling:
 
 ### 4.1 Filesystem Types
 
-`FILESYSTEM` controls **which ruleset** is applied:
+`FILESYSTEM` controls which ruleset is applied:
 
-- **`fat32`**: FAT32-style rules for legacy removable media
-  - 4GB max file size limit
-  - **Supports Unicode via LFN** (Long Filename UTF-16LE)
-  - Path limit: 260 characters
-  - Forbidden: `" * / : < > ? \ |` + control chars (0-31, 127)
-
-- **`exfat`**: exFAT-style rules for modern removable media
-  - No file size limit
-  - **Supports full Unicode**
-  - Path limit: 260 characters (conservative for Windows compatibility)
-  - Forbidden: same as FAT32
-
-- **`ntfs`**: Windows NTFS rules
-  - Full Unicode support
-  - Path limit: 255 characters
-  - Forbidden: universal forbidden + control characters
-
-- **`apfs`**: macOS APFS rules
-  - Full Unicode support (NFD normalized)
-  - Path limit: 255 characters
-  - Minimal forbidden character set
-
-- **`hfsplus`**: HFS+ legacy macOS rules
-  - Unicode support with colon handling
-  - Path limit: 255 characters
-  - Colon (`:`) replaced with alternate
-
-- **`universal`**: Maximum compatibility mode
-  - Most restrictive ruleset
-  - Works on ANY filesystem
-  - Path limit: 260 characters
+| Filesystem | Description | Path Limit | Unicode | File Size Limit |
+|------------|-------------|------------|---------|-----------------|
+| `fat32` | Legacy removable media | 260 chars | Via LFN (UTF-16LE) | 4GB max |
+| `exfat` | Modern removable media | 260 chars | Full UTF-16 | No limit |
+| `ntfs` | Windows NTFS | 255 chars | Full UTF-16 | No limit |
+| `apfs` | macOS APFS | 255 chars | Full (NFD) | No limit |
+| `hfsplus` | Legacy macOS | 255 chars | UTF-16 (NFD) | No limit |
+| `universal` | Maximum compatibility | 260 chars | Most restrictive | N/A |
 
 ### 4.2 Character Rules by Filesystem
 
 #### Universal Forbidden Characters (ALL modes)
 
 ```
-< > : " / \ | ? * NUL
+" * / : < > ? \ | NUL
 ```
 
-These characters are **never allowed** in any filesystem mode, as they're forbidden by at least one major filesystem.
+These characters are never allowed in any filesystem mode.
 
 #### FAT32/exFAT Specifics
 
-**Forbidden characters:**
-```
-" * / : < > ? \ |
-+ control characters (0-31, 127)
-```
-
-**Unicode Support via LFN:**
-- Long Filename (LFN) stored as UTF-16LE
-- Supports full Unicode range
-- Up to 255 UTF-16 code units
-- ✅ **Preserves all accented characters**
-
-**Example preserved characters:**
-```
-✅ è é à ò ù ï ê ñ ö ü ß ç ã õ
-✅ Loïc, Révérence, C'è di più, Café
-```
+- Forbidden: `" * / : < > ? \ |` and control characters (0x00–0x1F, 0x7F)
+- Unicode: via LFN — Long Filename stored as UTF-16LE, supports full Unicode range, up to 255 UTF-16 code units
+- Preserves all accented characters: Loïc, Révérence, Cè di più, Café
 
 #### NTFS Specifics
 
-**Forbidden characters:**
-```
-< > : " / \ | ? * NUL
-+ control characters (0x00–0x1F, 0x7F)
-```
-
-**Unicode Support:**
-- Native UTF-16LE storage
-- Full Unicode support
+- Forbidden: `" * / : < > ? \ | NUL` and control characters (0x00–0x1F, 0x7F)
+- Unicode: native UTF-16LE storage, full Unicode support
 - Case-insensitive, case-preserving
 
 #### APFS Specifics
 
-**Forbidden characters:**
-```
-/ : (minimal set)
-```
-
-**Unicode Support:**
-- NFD normalized (decomposed)
-- Full Unicode support
-- Case-insensitive or case-sensitive (depends on volume)
-
-**Note**: macOS uses NFD normalization, so `é` is stored as `e` + combining accent. The script handles NFC↔NFD conversion via `normalize_unicode()`.
+- Forbidden: minimal set (`:` and `/`)
+- Unicode: NFD normalized (decomposed) — `è` stored as `e` + combining accent
+- Full Unicode support, case-insensitive or case-sensitive (depends on volume)
+- The script handles NFC↔NFD conversion via `normalize_unicode()`
 
 #### HFS+ Specifics
 
-**Forbidden characters:**
-```
-: / (colon replaced with alternate)
-```
+- Forbidden: colon (replaced with alternate)
+- Unicode: UTF-16 storage, NFD normalized (like APFS)
 
-**Unicode Support:**
-- UTF-16 storage
-- NFD normalized (like APFS)
+#### Universal Mode
+
+- Most restrictive ruleset (union of all filesystem forbidden characters)
+- Works on ANY filesystem
+- Still preserves Unicode and accents
 
 ### 4.3 Path Length Semantics
 
-Path limits are **conservative** for cross-platform compatibility:
-
 | Filesystem | Path Limit | Reason |
-|------------|------------|--------|
+|------------|-----------|--------|
 | `fat32` | 260 chars | Windows MAX_PATH compatibility |
 | `exfat` | 260 chars | Windows MAX_PATH compatibility |
 | `ntfs` | 255 chars | NTFS native limit |
@@ -305,12 +251,7 @@ Path limits are **conservative** for cross-platform compatibility:
 | `hfsplus` | 255 chars | Legacy macOS limit |
 | `universal` | 260 chars | Most restrictive |
 
-**Why Conservative?**
-- Ensures compatibility with Windows tools
-- Avoids edge cases in backup/sync tools
-- Many applications still assume 260-character MAX_PATH
-
-**Implementation**: `check_path_length()` function
+Path limits are conservative for cross-platform compatibility, ensuring compatibility with Windows tools and backup/sync utilities that still assume 260-character MAX_PATH.
 
 ---
 
@@ -318,101 +259,129 @@ Path limits are **conservative** for cross-platform compatibility:
 
 ### 5.1 The Unicode Stack
 
-v12.x introduces a comprehensive Unicode handling architecture:
-
 ```
 Input Filename (potentially NFD or NFC)
-    ↓
-extract_utf8_chars() - Python 3
-    ↓ (UTF-8 safe extraction)
-sanitize_filename() - Bash + Python
-    ↓ (Remove illegal characters only)
-normalize_apostrophes() - Python 3 (v12.1.2 FIX)
-    ↓ (Safe Unicode-aware normalization)
-normalize_unicode() - Python 3 / uconv / Perl
-    ↓ (NFD → NFC conversion)
+    │
+    ▼
+extract_utf8_chars()        ← Python 3: UTF-8 safe extraction
+    │
+    ▼
+sanitize_filename()         ← Bash + Python: Remove illegal characters only
+    │   └── is_illegal_char()   ← Fixed in v12.1.4: ! NOT operator
+    │
+    ▼
+normalize_apostrophes()     ← Python 3 (v12.1.2 FIX): Safe Unicode-aware
+    │
+    ▼
+normalize_unicode()         ← Python 3 / uconv / Perl: NFD → NFC conversion
+    │
+    ▼
 Output Filename (NFC normalized, Unicode preserved)
 ```
 
 ### 5.2 Key Functions
 
-#### `extract_utf8_chars(text)` - Python 3
+#### `extract_utf8_chars(text)` — Python 3
 
-**Purpose**: Safely extract UTF-8 characters from potentially mixed-encoding input
+**Purpose:** Safely extract UTF-8 characters from potentially mixed-encoding input.
 
-**Implementation**:
 ```python
-def extract_utf8_chars():
-    import sys
-    text = sys.stdin.read().strip()
-    # Python's stdin handles UTF-8 natively
-    print(text)
+import sys
+text = sys.stdin.read().strip()
+try:
+    text.encode('utf-8')
+    for c in text:
+        print(c)
+except UnicodeEncodeError:
+    sys.exit(1)
 ```
 
-**Why needed**: Bash string operations can corrupt multi-byte UTF-8. Python handles UTF-8 natively.
+**Why needed:** Bash string operations can corrupt multi-byte UTF-8. Python handles UTF-8 natively.
 
-#### `normalize_apostrophes(text)` - Python 3 (v12.1.2 FIX)
+**Fallback chain:** Python 3 → Perl (`-CSD -ne 'print for split //'`) → `grep -o .` (WARNING: may break UTF-8)
 
-**Purpose**: Normalize curly apostrophes to straight apostrophes without corrupting UTF-8
+#### `normalize_apostrophes(text)` — Python 3 (v12.1.2 Fix)
 
-**The Bug (v12.1.1)**:
+**Purpose:** Normalize curly apostrophes to straight apostrophes without corrupting UTF-8.
+
+**The Bug (v12.1.1 and earlier):**
+
 ```bash
 # BROKEN: Bash glob pattern corrupted UTF-8
-text="${text//'/\'}"  # ❌ Matches more than intended
+text="${text//'/\'}"
 # Result: "Loïc" → "Loic" (accent stripped!)
 ```
 
-**The Fix (v12.1.2)**:
+**The Fix (v12.1.2+):**
+
 ```python
-def normalize_apostrophes():
-    import sys
-    text = sys.stdin.read().strip()
-    
-    # Explicit Unicode code points - no ambiguity!
-    replacements = {
-        '\u2018': "'",  # LEFT SINGLE QUOTATION MARK
-        '\u2019': "'",  # RIGHT SINGLE QUOTATION MARK
-        '\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
-        '\u02BC': "'",  # MODIFIER LETTER APOSTROPHE
-    }
-    
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    
-    print(text)
+replacements = {
+    '\u2018': "'",  # LEFT SINGLE QUOTATION MARK
+    '\u2019': "'",  # RIGHT SINGLE QUOTATION MARK
+    '\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
+    '\u02BC': "'",  # MODIFIER LETTER APOSTROPHE
+}
+for old, new in replacements.items():
+    text = text.replace(old, new)
 ```
 
-**Why this works**:
-- Uses explicit Unicode code points (`\u2018` not `'`)
-- Python's `.replace()` is UTF-8 safe
-- Character-by-character replacement
-- No glob pattern ambiguity
+**Why this works:** Uses explicit Unicode code points (U+2018 not `'`); Python's `.replace()` is UTF-8 safe; character-by-character replacement with no glob pattern ambiguity.
 
-**Fallback**: If Python unavailable, skip normalization (preserve curly apostrophes rather than corrupt)
+**Fallback:** If Python unavailable, skip normalization entirely (preserve curly apostrophes rather than corrupt).
 
-#### `normalize_unicode(text)` - Multiple backends
+#### `normalize_unicode(text)` — Multiple Backends (v12.1.3+)
 
-**Purpose**: Convert NFD (macOS decomposed) to NFC (Windows/Linux composed)
+**Purpose:** Convert NFD (macOS decomposed) to NFC (Windows/Linux composed).
 
-**Backends** (priority order):
+**Backends (priority order):**
+
 1. **Python 3** (preferred):
    ```python
    import unicodedata
-   text = unicodedata.normalize('NFC', text)
+   print(unicodedata.normalize('NFC', text))
    ```
 
 2. **uconv** (ICU tools):
    ```bash
-   echo "$text" | uconv -x "::NFD; ::NFC;"
+   echo "$text" | uconv -f UTF-8 -t UTF-8 -x NFC
    ```
 
 3. **Perl** (fallback):
    ```perl
    use Unicode::Normalize;
-   $text = NFC($text);
+   print NFC($text);
    ```
 
-**Why needed**: macOS stores `é` as `e` + combining accent (NFD). Windows/Linux store `é` as single code point (NFC). Normalization ensures consistency.
+4. **iconv** (last resort — doesn't normalize but preserves UTF-8):
+   ```bash
+   echo "$text" | iconv -f UTF-8 -t UTF-8
+   ```
+
+**Why needed:** macOS stores `è` as `e` + combining accent (NFD). Windows/Linux store `è` as single code point (NFC). Without normalization, identical-looking filenames compare as different.
+
+#### `is_illegal_char(char, illegal_chars)` — Bash
+
+**Purpose:** Check whether a character is illegal for the target filesystem.
+
+**v12.1.4 Fix:** The conditional logic was inverted in v12.1.3:
+
+```bash
+# BEFORE (v12.1.3) — BUGGY
+if is_illegal_char "$char" "$illegal_chars"; then
+    sanitized="${sanitized}${REPLACEMENT_CHAR}"  # Legal chars went here!
+else
+    sanitized="$sanitized$char"                  # Illegal chars went here!
+fi
+
+# AFTER (v12.1.4) — FIXED
+if ! is_illegal_char "$char" "$illegal_chars"; then
+    sanitized="$sanitized$char"                  # Legal chars preserved ✅
+else
+    sanitized="${sanitized}${REPLACEMENT_CHAR}"   # Illegal chars replaced ✅
+fi
+```
+
+**Implementation:** Uses explicit `case` statement to check each illegal character, returning 0 (true/illegal) or 1 (false/legal).
 
 ### 5.3 Configuration Variables (v12.x)
 
@@ -421,8 +390,25 @@ def normalize_apostrophes():
 | `PRESERVE_UNICODE` | `true` | Preserve all Unicode characters |
 | `NORMALIZE_APOSTROPHES` | `true` | Normalize curly apostrophes (v12.1.2 FIXED) |
 | `EXTENDED_CHARSET` | `true` | Allow extended character sets |
+| `DEBUG_UNICODE` | `false` | NFD/NFC diagnostic output to stderr (v12.1.3+) |
 
-**Note**: In v12.1.2, these defaults ensure maximum Unicode preservation while still normalizing apostrophes safely.
+### 5.4 DEBUG_UNICODE Mode (v12.1.3+)
+
+When `DEBUG_UNICODE=true`, the script prints diagnostic output to stderr for every item processed:
+
+```bash
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music 2>debug.log
+```
+
+Output format:
+
+```
+DEBUG: Original: 'Ce la farò.wav' → NFC: 'Ce la farò.wav'
+DEBUG: Sanitized: 'Ce la farò.wav' → NFC: 'Ce la farò.wav'
+DEBUG: MISMATCH DETECTED
+```
+
+This is invaluable for diagnosing false `RENAMED` status on macOS where NFD/NFC differences may cause string comparison mismatches.
 
 ---
 
@@ -430,108 +416,101 @@ def normalize_apostrophes():
 
 ### 6.1 Sanitization Modes
 
-`SANITIZATION_MODE` defines **how aggressively** names are modified:
+`SANITIZATION_MODE` defines how aggressively names are modified:
 
 #### `conservative` (RECOMMENDED DEFAULT)
-- Removes only **officially forbidden** characters per filesystem
-- **Preserves**: apostrophes, accents, Unicode, spaces
-- **Removes**: `< > : " / \ | ? *` (universal forbidden)
-- **Best for**: Music libraries, documents, general use
 
-**Example**:
+- Removes only officially forbidden characters per filesystem
+- Preserves apostrophes, accents, Unicode, spaces
+- Removes `" * / : < > ? \ |` (universal forbidden)
+- Best for: Music libraries, documents, general use
+
 ```
-✅ "Café del Mar.mp3"         → unchanged
-✅ "L'interprète.flac"        → unchanged
-❌ "song:test.mp3"            → "song_test.mp3"
+Café del Mar.mp3       → unchanged ✅
+L'interprète.flac      → unchanged ✅
+song<test>.mp3         → song_test_.mp3
 ```
 
 #### `strict` (MAXIMUM SAFETY)
-- Removes **all problematic** characters
-- Adds extra safety checks
-- **Preserves**: accents and Unicode (only removes control/dangerous chars)
-- **Best for**: Untrusted sources, automation scripts
 
-**Example**:
+- Removes all problematic characters including control chars
+- Adds extra safety checks
+- Preserves accents and Unicode (only removes control/dangerous chars)
+- Best for: Untrusted sources, automation scripts
+
 ```
-✅ "Café.mp3"                 → unchanged
-❌ "file$(cmd).txt"           → "file__cmd_.txt" (shell chars removed)
+Café.mp3               → unchanged ✅
+file$(cmd).txt         → file__cmd_.txt (shell chars removed)
 ```
 
 #### `permissive` (MINIMAL CHANGES)
-- Removes only **universal forbidden** characters
+
+- Removes only universal forbidden characters
 - Fastest, least invasive
-- **Best for**: Speed-optimized workflows
+- Best for: Speed-optimized workflows
 
 ### 6.2 Sanitization Pipeline
 
 The `sanitize_filename()` function implements a multi-stage pipeline:
 
 ```
-Input: "Loïc Nottet's Song<Test>:2024.flac"
-    ↓
-Stage 1: Extract UTF-8 characters (Python 3)
-    → "Loïc Nottet's Song<Test>:2024.flac"
-    ↓
-Stage 2: Remove universal forbidden characters
-    → "Loïc Nottet's Song_Test__2024.flac"
-    ↓
-Stage 3: Control characters (if strict/NTFS)
-    → (no control chars in this example)
-    ↓
-Stage 4: Unicode line separators
-    → (no line breaks in this example)
-    ↓
-Stage 5: Filesystem-specific restrictions
-    → (FAT32: no additional restrictions)
-    ↓
-Stage 6: Shell metacharacters (if CHECK_SHELL_SAFETY=true)
-    → (apostrophe preserved in conservative mode)
-    ↓
-Stage 7: Unicode exploits (if CHECK_UNICODE_EXPLOITS=true)
-    → (no zero-width chars in this example)
-    ↓
-Stage 8: Normalize apostrophes (Python 3, v12.1.2)
-    → "Loïc Nottet's Song_Test__2024.flac"
-    ↓
-Stage 9: Leading/trailing cleanup
-    → (no dots to remove)
-    ↓
-Stage 10: Reserved names (Windows/DOS)
-    → (not a reserved name)
-    ↓
-Output: "Loïc Nottet's Song_Test__2024.flac"
-Status: RENAMED (< > : removed, accents preserved!)
+Input: "Loïc Nottet's Song<Test>2024.flac"
+
+Stage 1:  Extract UTF-8 characters (Python 3)
+          "Loïc Nottet's Song<Test>2024.flac"
+
+Stage 2:  Character-by-character classification (v12.1.4 FIXED)
+          For each char:
+            if ! is_illegal_char → PRESERVE
+            else → REPLACE with REPLACEMENT_CHAR
+          "Loïc Nottet's Song_Test_2024.flac"
+
+Stage 3:  Control characters (if strict/NTFS)
+          (no control chars in this example)
+
+Stage 4:  Shell metacharacters (if CHECK_SHELL_SAFETY=true)
+          (apostrophe preserved in conservative mode)
+
+Stage 5:  Unicode exploits (if CHECK_UNICODE_EXPLOITS=true)
+          (no zero-width chars in this example)
+
+Stage 6:  Normalize apostrophes (Python 3, v12.1.2+)
+          "Loïc Nottet's Song_Test_2024.flac"
+          (curly→straight if applicable)
+
+Stage 7:  Leading/trailing cleanup
+          (remove leading/trailing spaces and dots)
+
+Stage 8:  Reserved names (Windows/DOS)
+          (not a reserved name)
+
+Output: "Loïc Nottet's Song_Test_2024.flac"
+Status: RENAMED (< and > removed, accents preserved!)
 ```
 
 ### 6.3 Character Replacement
 
-**Default replacement character**: `_` (underscore)
+Default replacement character: underscore (`_`). Configurable via `REPLACEMENT_CHAR`.
 
-**Configurable via**: `REPLACEMENT_CHAR`
-
-**Examples**:
 ```bash
-REPLACEMENT_CHAR=_  # song<test>.mp3 → song_test_.mp3
-REPLACEMENT_CHAR=-  # song<test>.mp3 → song-test-.mp3
-REPLACEMENT_CHAR=" " # song<test>.mp3 → song test .mp3
+REPLACEMENT_CHAR=_   → song<test>.mp3 → song_test_.mp3
+REPLACEMENT_CHAR=-   → song<test>.mp3 → song-test-.mp3
+REPLACEMENT_CHAR=" " → song<test>.mp3 → song test .mp3
 ```
 
 ### 6.4 Reserved Names (Windows/DOS)
 
-Windows reserves certain filenames for legacy DOS devices:
+Windows reserves certain filenames for legacy DOS devices: `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`.
+
+Handling: Append `_reserved` suffix.
 
 ```
-CON, PRN, AUX, NUL, COM1-9, LPT1-9
+CON.txt    → CON_reserved.txt
+LPT1.log   → LPT1_reserved.log
+normal.txt → normal.txt (unchanged)
 ```
 
-**Handling**: Append `-reserved` suffix
-
-**Examples**:
-```
-CON.txt      → CON-reserved.txt
-LPT1.log     → LPT1-reserved.log
-normal.txt   → normal.txt (unchanged)
-```
+Applied in `fat32`, `ntfs`, and `universal` modes.
 
 ---
 
@@ -539,23 +518,17 @@ normal.txt   → normal.txt (unchanged)
 
 ### 7.1 Rationale
 
-Filesystem roots often contain system files that should **never be touched**:
+Filesystem roots often contain system files that should never be touched:
+- `.DS_Store` — macOS Finder metadata
+- `Thumbs.db` — Windows thumbnail cache
+- `.Spotlight-V100` — macOS Spotlight index
+- `.stfolder`, `.stignore` — Syncthing
+- `.sync.ffs_db`, `.sync.ffsdb` — FreeFileSync
+- `.gitignore` — Git
 
-- `.DS_Store` (macOS Finder metadata)
-- `Thumbs.db` (Windows thumbnail cache)
-- `.Spotlight-V100` (macOS Spotlight index)
-- `.stfolder`, `.stignore` (Syncthing)
-- `.sync.ffs_db`, `.sync.ffsdb` (FreeFileSync)
-- `.gitignore` (Git)
-
-Processing these files:
-- Clutters logs with noise
-- Risks breaking tools that expect these files
-- Serves no user purpose
+Processing these files clutters logs with noise, risks breaking tools that expect them, and serves no user purpose.
 
 ### 7.2 Implementation
-
-**Function**: `should_skip_system_file(item)`
 
 ```bash
 should_skip_system_file() {
@@ -572,685 +545,623 @@ should_skip_system_file() {
 }
 ```
 
-**Usage** (both directories and files):
-```bash
-if should_skip_system_file "$filename"; then
-    continue  # Not even logged to CSV
-fi
-```
-
-**Result**:
-- System files are invisible to the sanitizer
-- CSV logs contain only user data
-- Processing is ~5-10% faster
+System files are invisible to the sanitizer — not even logged to CSV. Processing is ~5–10% faster as a result.
 
 ---
 
-## 8. Directory Processing Strategy
+## 8. Ignore Patterns
 
-### 8.1 Bottom-Up Renaming
+### 8.1 Purpose
 
-Directory renaming **must** be done **bottom-up** to avoid path breakage:
+User-defined patterns to exclude specific files, directories, or glob patterns from processing.
 
-**Why?**
-- If parent directories are renamed first, all child paths become invalid
-- Bottom-up guarantees children are processed while parent paths are still valid
+### 8.2 Implementation
 
-**Implementation**:
 ```bash
-find "$TARGET_DIR" -type d -print0 2>/dev/null | \
-  sort -z -r | \
-  while IFS= read -r -d '' dir; do
-    # Process from deepest to shallowest
-    process_directory "$dir"
-  done
+should_ignore() {
+    local file="$1"
+    local patternfile="$2"
+
+    if [[ ! -f "$patternfile" ]]; then return 1; fi
+
+    local pattern
+    while IFS= read -r pattern; do
+        [[ "$pattern" =~ ^[[:space:]]*# ]] && continue  # Skip comments
+        [[ -z "$pattern" ]] && continue                   # Skip empty lines
+        pattern=$(echo "$pattern" | sed 's/[[:space:]]*$//')
+        if [[ "$file" == *"$pattern"* ]]; then
+            return 0  # Match — ignore this item
+        fi
+    done < "$patternfile"
+    return 1  # No match
+}
 ```
 
-**Example**:
+### 8.3 Example Ignore File
+
+```bash
+# exfat-sanitizer-ignore.txt
+
+# macOS metadata
+.DS_Store
+.AppleDouble
+.AppleDB
+.LSOverride
+.TemporaryItems
+
+# Windows metadata
+Thumbs.db
+Desktop.ini
+
+# Syncthing
+.stfolder
+.stignore
+
+# FreeFileSync
+.sync.ffs_db
+.sync.ffsdb
+
+# System/indexing
+.Spotlight-V100
+.metadata
+
+# Custom
+*.tmp
+*.bak
+NOTE.txt
+.fseventsd
+```
+
+A ready-to-use example file is included: [`exfat-sanitizer-ignore.example.txt`](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/exfat-sanitizer-ignore.example.txt)
+
+Items matching ignore patterns are logged with `IGNORED` status in the CSV and are not processed.
+
+---
+
+## 9. Directory Processing Strategy
+
+### 9.1 Bottom-Up Renaming
+
+Directory renaming must be done bottom-up to avoid path breakage. If parent directories are renamed first, all child paths become invalid.
+
 ```
 Original structure:
-/Music/Bad<Dir>/Sub:Dir/file.mp3
+Music/Bad<Dir>/Sub*Dir/file.mp3
 
 Bottom-up processing order:
-1. /Music/Bad<Dir>/Sub:Dir   → /Music/Bad<Dir>/Sub_Dir
-2. /Music/Bad<Dir>            → /Music/Bad_Dir_
-3. /Music                     → /Music (no change)
+1. Music/Bad<Dir>/Sub*Dir → Music/Bad<Dir>/Sub_Dir
+2. Music/Bad<Dir>         → Music/Bad_Dir
+3. Music/                 → Music/ (no change)
 
 Final structure:
-/Music/Bad_Dir_/Sub_Dir/file.mp3
+Music/Bad_Dir/Sub_Dir/file.mp3
 ```
 
-### 8.2 Directory Processing Loop
+### 9.2 Directory Processing Loop
 
 For each directory:
+1. Skip if system directory (`should_skip_system_file`)
+2. Skip if matches ignore pattern (`should_ignore`)
+3. Normalize name to NFC (`normalize_unicode`) ← v12.1.3+
+4. Sanitize dirname via `sanitize_filename()`
+5. Normalize sanitized name to NFC ← v12.1.3+
+6. Compare NFC(original) vs NFC(sanitized) — prevents NFD/NFC false positives
+7. Optional `DEBUG_UNICODE` output ← v12.1.3+
+8. Copy if `COPY_TO` set
+9. Branch based on `DRY_RUN`:
+   - `DRY_RUN=true` → Log only, no `mv`
+   - `DRY_RUN=false` → `mv` directory, log result
+10. Log to CSV with status (`LOGGED`, `RENAMED`, `FAILED`)
+11. Recurse into children
 
-1. **Skip** if system directory (`should_skip_system_file()`)
-2. **Extract** dirname and parent path
-3. **Sanitize** dirname via `sanitize_filename()`
-4. **Normalize** apostrophes via `normalize_apostrophes()`
-5. **Normalize** Unicode via `normalize_unicode()`
-6. **Compare** old vs new (with normalization for false positive prevention)
-7. **Check** path length via `check_path_length()`
-8. **Check** for collision via `is_path_used()`
-9. **Branch** based on `DRY_RUN`:
-   - `DRY_RUN=true`: Log only, no `mv`
-   - `DRY_RUN=false`: `mv` directory, log result
-10. **Log** to CSV with status (`LOGGED`, `RENAMED`, `FAILED`)
+### 9.3 Collision Detection
 
-### 8.3 Collision Detection
+**Problem:** Two distinct names might sanitize to the same result.
 
-**Problem**: Two distinct names might sanitize to the same result
-
-**Example**:
 ```
-"Song<Test>.mp3"  → "Song_Test_.mp3"
-"Song:Test?.mp3"  → "Song_Test_.mp3"  # COLLISION!
+Song<Test>.mp3  → Song_Test_.mp3
+Song?Test?.mp3  → Song_Test_.mp3   ← COLLISION!
 ```
 
-**Solution**: `is_path_used()` + `register_path()`
+**Solution:** Path registration via temp file.
 
 ```bash
-USED_PATHS_FILE="/tmp/exfat-sanitizer-paths.txt"
+USEDPATHSFILE="$TEMPCOUNTERDIR/usedpaths.txt"
 
-is_path_used() {
-    local path="$1"
-    grep -Fxq "$path" "$USED_PATHS_FILE" 2>/dev/null
-}
-
-register_path() {
-    local path="$1"
-    echo "$path" >> "$USED_PATHS_FILE"
-}
+is_path_used() { grep -Fxq "$1" "$USEDPATHSFILE" 2>/dev/null; }
+register_path() { echo "$1" >> "$USEDPATHSFILE"; }
 ```
 
-**Result**: Second file with collision gets `FAILED` status, not silently clobbered
+The second file with a collision gets `FAILED` status — never silently clobbered.
 
 ---
 
-## 9. File Processing Strategy
+## 10. File Processing Strategy
 
-### 9.1 Processing Loop
+### 10.1 Processing Loop
 
 For files, the script:
-
-1. **Walk** using `find -type f -print0` (null-terminated for safety)
-2. **For each file**:
-   - Increment `scanned_files` counter
-   - Optionally print progress (every 100 files)
-   - Extract `filename` and `parentdir`
+1. Walks using `find -type f` (null-terminated for binary safety)
+2. For each file:
    - Skip if system file
-   - Sanitize filename via full pipeline
-   - Build `newpath = parentdir/newfilename`
+   - Skip if matches ignore pattern
+   - Normalize to NFC, sanitize, normalize sanitized to NFC
+   - Compare NFC(original) vs NFC(sanitized)
    - Check path length
-   - Branch based on:
-     - `had_changes`
-     - `DRY_RUN`
-     - `COPY_TO` usage
-3. **Log** to CSV with detailed status
+   - Branch based on `DRY_RUN` and `COPY_TO`
+3. Log to CSV with detailed status
 
-### 9.2 Copy Mode Architecture
+### 10.2 Copy Mode Architecture
 
 `COPY_TO` enables non-destructive copying with sanitization:
-
-**Features**:
 - Source tree remains untouched
 - Destination tree has sanitized names
 - Conflict resolution options
-- Disk space validation
-
-**Key Functions**:
-
-#### `validate_destination_path(dest)`
-- Checks destination exists
-- Validates write permissions
-- Estimates disk space requirements
+- Directory structure created automatically
 
 #### `handle_file_conflict(dest_file, behavior)`
-- **`skip`** (default): Keep existing file
-- **`overwrite`**: Replace existing file
-- **`version`**: Create versioned copy (`file-v1.ext`, `file-v2.ext`)
 
-**Example** (`COPY_BEHAVIOR=version`):
+| Behavior | Action |
+|----------|--------|
+| `skip` (default) | Keep existing file — return 1 (skip copy) |
+| `overwrite` | Replace existing file — `rm -f` then copy |
+| `version` | Create versioned copy — `file-v1.ext`, `file-v2.ext` |
+
+Version example:
 ```
 1st run: song.mp3 → /Volumes/Backup/song.mp3
 2nd run: song.mp3 → /Volumes/Backup/song-v1.mp3
 3rd run: song.mp3 → /Volumes/Backup/song-v2.mp3
 ```
 
-#### `copy_file(source, dest_dir, dest_filename, behavior)`
-- Validates source file
-- Creates destination directory if needed
+#### `copy_file(source, destdir, destfilename, behavior)`
+
+- Creates destination directory if needed (`mkdir -p`)
 - Handles conflicts per `COPY_BEHAVIOR`
+- Uses `cp` for the actual copy operation
 - Logs copy status to CSV
 - Returns success/failure
 
-### 9.3 CSV Status Fields
+### 10.3 CSV Status Fields
 
 **Status column** (rename processing):
-- `LOGGED`: No rename needed (compliant filename)
-- `RENAMED`: File was renamed (illegal characters found)
-- `FAILED`: Rename failed (permissions, collision, path too long)
+- `LOGGED` — No rename needed (compliant filename)
+- `RENAMED` — File was renamed (illegal characters found)
+- `IGNORED` — File matched ignore pattern
+- `FAILED` — Rename failed (permissions, collision, path too long)
 
 **Copy Status column** (copy processing):
-- `COPIED`: Successfully copied to destination
-- `SKIPPED`: Copy skipped due to conflict (with `COPY_BEHAVIOR=skip`)
-- `FAILED`: Copy failed (I/O or permission error)
-- `NA`: Copy mode not in use (`COPY_TO` not set)
-
-**Example CSV rows**:
-```csv
-Type|Old Name|New Name|Issues|Path|Path Length|Status|Copy Status|Ignore Pattern
-File|Loïc.flac|Loïc.flac|-|Music|25|LOGGED|NA|-
-File|song:test.mp3|song_test.mp3|IllegalChar|Music|27|RENAMED|COPIED|-
-File|CON.txt|CON-reserved.txt|ReservedName|Docs|15|RENAMED|NA|-
-```
+- `COPIED` — Successfully copied to destination
+- `SKIPPED` — Copy skipped due to conflict (`COPY_BEHAVIOR=skip`)
+- `FAILED` — Copy failed (IO or permission error)
+- `NA` — Copy mode not in use (`COPY_TO` not set)
 
 ---
 
-## 10. Tree Generation (v12.1.0+)
+## 11. Tree Generation (v12.1.0+)
 
-### 10.1 Purpose
+### 11.1 Purpose
 
-`GENERATE_TREE=true` creates a CSV snapshot of the directory structure:
+`GENERATE_TREE=true` creates a CSV snapshot of the directory structure before processing. Use cases: compare before/after sanitization, document library structure, audit file organization, generate manifests.
 
-**Use cases**:
-- Compare before/after sanitization
-- Document library structure
-- Audit file organization
-- Generate manifests
+### 11.2 Implementation
 
-### 10.2 Implementation
-
-**Function**: `generate_tree(root_dir, csv_file)`
-
-**Algorithm**:
 ```bash
-# Walk entire tree
-find "$root_dir" -print0 | sort -z | while IFS= read -r -d '' item; do
-    # Determine type (File or Directory)
-    # Calculate depth (path component count)
-    # Determine if directory has children
-    # Log to tree CSV
-done
+generate_tree_snapshot() {
+    local targetdir="$1"
+    local outputfile="tree_${FILESYSTEM}_$(date +%Y%m%d_%H%M%S).csv"
+    echo "Type|Name|Path|Depth" > "$outputfile"
+
+    process_tree_recursive() {
+        local currentpath="$1"
+        local depth="${2:-0}"
+        local item
+        for item in "$currentpath"/*; do
+            [[ ! -e "$item" ]] && continue
+            local name=$(basename "$item")
+            should_skip_system_file "$name" && continue
+            local relativepath="${item#$targetdir/}"
+            if [[ -d "$item" ]]; then
+                echo "Directory|$name|$relativepath|$depth" >> "$outputfile"
+                process_tree_recursive "$item" $((depth + 1))
+            else
+                echo "File|$name|$relativepath|$depth" >> "$outputfile"
+            fi
+        done
+    }
+
+    process_tree_recursive "$targetdir" 0
+    echo "$outputfile"
+}
 ```
 
-### 10.3 Tree CSV Format
+### 11.3 Tree CSV Format
 
-**Filename**: `tree_<filesystem>_<YYYYMMDD_HHMMSS>.csv`
-
-**Columns**:
 ```csv
 Type|Name|Path|Depth
-Directory|Music|Music|0
-Directory|Loic Nottet|Music/Loic Nottet|1
-File|01 Rhythm Inside.flac|Music/Loic Nottet/01 Rhythm Inside.flac|2
+Directory|Loïc Nottet|Loïc Nottet|0
+Directory|2015 Rhythm Inside|Loïc Nottet/2015 Rhythm Inside|1
+File|01 Rhythm Inside.flac|Loïc Nottet/2015 Rhythm Inside/01 Rhythm Inside.flac|2
 ```
 
-**Field descriptions**:
-- `Type`: `File` or `Directory`
-- `Name`: Item name only (no path)
-- `Path`: Relative path from root
-- `Depth`: Directory nesting level (0 = root)
+### 11.4 Workflow: Before/After Comparison
 
-### 10.4 Workflow Example
-
-**Before sanitization**:
 ```bash
-FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.2.sh ~/Music
-# Generates: tree_fat32_20260203_120000.csv (before)
-```
+# Before sanitization
+FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music
+# Generates: tree_fat32_20260217_120000.csv (before)
 
-**After sanitization**:
-```bash
-FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.2.sh ~/Music
-# Generates: tree_fat32_20260203_120100.csv (after)
-```
+# After sanitization
+FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh ~/Music
+# Generates: tree_fat32_20260217_120100.csv (after)
 
-**Compare**:
-```bash
-diff tree_fat32_20260203_120000.csv tree_fat32_20260203_120100.csv
+# Compare
+diff tree_fat32_20260217_120000.csv tree_fat32_20260217_120100.csv
 ```
 
 ---
 
-## 11. Counters, Temp Files & Traps
+## 12. Counters, Temp Files & Traps
 
-### 11.1 Why Temp Counters?
+### 12.1 Why Temp Counters?
 
-Bash pipelines and subshells make shared variables difficult:
-- Variables in subshells don't propagate to parent
-- Pipelines spawn subshells (`while` in pipeline)
-- Shared state across nested functions is error-prone
+Bash pipelines and subshells make shared variables difficult. Variables in subshells don't propagate to parent; pipelines spawn subshells. Solution: use temp files as counter stores.
 
-**Solution**: Use temp files as counter stores
-
-### 11.2 Counter Lifecycle
-
-**Initialization**: `init_temp_counters()`
 ```bash
-TEMP_COUNTER_DIR=$(mktemp -d)
-for counter in scanned_dirs scanned_files renamed_dirs renamed_files \
-               failed_dirs failed_files copied_files skipped_items \
-               failed_items path_length_issues; do
-    echo "0" > "$TEMP_COUNTER_DIR/$counter"
+# Problem:
+count=0
+find . -type f | while read file; do
+    count=$((count + 1))
 done
+echo $count  # Always prints 0! (subshell isolation)
+
+# Solution:
+echo 0 > /tmp/count
+find . -type f | while read file; do
+    echo $(( $(cat /tmp/count) + 1 )) > /tmp/count
+done
+cat /tmp/count  # Correct count
 ```
 
-**Increment**: `increment_counter(name)`
+### 12.2 Counter Lifecycle
+
+**Initialization:** Create temp directory with `mktemp -d`, initialize counters (scanned_dirs, scanned_files, renamed_dirs, renamed_files, etc.) to 0.
+
+**Cleanup:** `trap cleanup_temp_counters EXIT` ensures temp files are removed even on errors or `Ctrl+C`.
+
+### 12.3 Used Paths File
+
+Tracks claimed paths to detect collisions:
+
 ```bash
-increment_counter() {
-    local name="$1"
-    local file="$TEMP_COUNTER_DIR/$name"
-    local value=$(cat "$file")
-    echo $((value + 1)) > "$file"
-}
+USEDPATHSFILE="$TEMPCOUNTERDIR/usedpaths.txt"
+register_path() { echo "$1" >> "$USEDPATHSFILE"; }
+is_path_used() { grep -Fxq "$1" "$USEDPATHSFILE" 2>/dev/null; }
 ```
 
-**Read**: `get_counter(name)`
-```bash
-get_counter() {
-    local name="$1"
-    cat "$TEMP_COUNTER_DIR/$name" 2>/dev/null || echo "0"
-}
-```
-
-**Cleanup**: `cleanup_temp_counters()`
-```bash
-cleanup_temp_counters() {
-    rm -rf "$TEMP_COUNTER_DIR"
-}
-
-trap cleanup_temp_counters EXIT
-```
-
-### 11.3 USED_PATHS_FILE
-
-**Purpose**: Track claimed paths to detect collisions
-
-**Implementation**:
-```bash
-USED_PATHS_FILE="$TEMP_COUNTER_DIR/used_paths.txt"
-
-register_path() {
-    echo "$1" >> "$USED_PATHS_FILE"
-}
-
-is_path_used() {
-    grep -Fxq "$1" "$USED_PATHS_FILE" 2>/dev/null
-}
-```
-
-**Why needed**: Prevents two distinct filenames that sanitize to the same result from clobbering each other
+Prevents two distinct filenames that sanitize to the same result from clobbering each other.
 
 ---
 
-## 12. CSV Logging & Exports
+## 13. CSV Logging & Exports
 
-### 12.1 Main CSV Log
+### 13.1 Main CSV Log
 
-**Filename pattern**:
-```
-sanitizer_<filesystem>_<YYYYMMDD_HHMMSS>.csv
-```
+Filename pattern: `sanitizer_<filesystem>_<YYYYMMDD_HHMMSS>.csv`
 
-**Columns**:
-1. **Type**: `File` or `Directory`
-2. **Old Name**: Original filename
-3. **New Name**: Sanitized filename (may equal Old Name)
-4. **Issues**: Comma-separated issue flags
-5. **Path**: Parent directory path
-6. **Path Length**: Character count of full new path
-7. **Status**: `LOGGED`, `RENAMED`, or `FAILED`
-8. **Copy Status**: `COPIED`, `SKIPPED`, `FAILED`, or `NA`
-9. **Ignore Pattern**: Ignore pattern matched (or `-`)
+Columns:
+1. **Type** — `File` or `Directory`
+2. **Old Name** — Original filename
+3. **New Name** — Sanitized filename (may equal Old Name)
+4. **Issues** — Comma-separated issue flags
+5. **Path** — Parent directory path
+6. **Path Length** — Character count of full new path
+7. **Status** — `LOGGED`, `RENAMED`, `IGNORED`, or `FAILED`
+8. **Copy Status** — `COPIED`, `SKIPPED`, `FAILED`, or `NA`
+9. **Ignore Pattern** — Pattern matched, or `-`
 
-**Issue flags**:
-- `IllegalChar`: Universal forbidden characters found
-- `FAT32Specific`: FAT32-specific forbidden characters
-- `ControlChar`: Control characters found
-- `ShellDangerous`: Shell metacharacters found
-- `ZeroWidth`: Zero-width characters found
-- `ReservedName`: Windows reserved name
-- `PathTooLong`: Path exceeds length limit
+**Issue flags:**
+- `IllegalChar` — Universal forbidden characters found
+- `FAT32Specific` — FAT32-specific forbidden characters
+- `ControlChar` — Control characters found
+- `ShellDangerous` — Shell metacharacters found
+- `ZeroWidth` — Zero-width characters found
+- `ReservedName` — Windows reserved name
+- `PathTooLong` — Path exceeds length limit
 
-**Example**:
+**Example:**
+
 ```csv
 Type|Old Name|New Name|Issues|Path|Path Length|Status|Copy Status|Ignore Pattern
-File|Loïc Nottet.flac|Loïc Nottet.flac|-|Music|45|LOGGED|NA|-
-File|Song<test>.mp3|Song_test_.mp3|IllegalChar|Music|47|RENAMED|COPIED|-
-Directory|Bad:Dir|Bad_Dir|IllegalChar|Music|40|RENAMED|NA|-
+File|Loïc Nottet.flac|Loïc Nottet.flac|-|Music/|45|LOGGED|NA|-
+File|Song<test>.mp3|Song_test_.mp3|IllegalChar|Music/|47|RENAMED|COPIED|-
+Directory|Bad:Dir|Bad_Dir|IllegalChar|Music/|40|RENAMED|NA|-
 ```
 
-### 12.2 CSV Escaping
+### 13.2 CSV Escaping
 
-**Rules**:
-- Fields separated by `|` (pipe)
-- Double quotes in data are doubled (`"` → `""`)
+- Fields separated by pipe (`|`)
+- Double quotes in data are doubled
 - Newlines removed during sanitization
 - Null bytes removed
 
-**Example**:
-```
-Original: Song "Best" (2024).mp3
-Escaped:  Song ""Best"" (2024).mp3
-```
+### 13.3 Log File Location
 
-### 12.3 Log File Location
-
-Created in the **current working directory** where the script is run:
+Created in the current working directory where the script is run:
 
 ```bash
-pwd
-# /Users/username
-
-./exfat-sanitizer-v12.1.2.sh ~/Music
-# Creates: /Users/username/sanitizer_fat32_20260203_123456.csv
+pwd  # /Users/username
+./exfat-sanitizer-v12.1.4.sh ~/Music
+# Creates: /Users/username/sanitizer_fat32_20260217_123456.csv
 ```
 
 ---
 
-## 13. Error Handling Strategy
+## 14. Error Handling Strategy
 
-### 13.1 Philosophy
+### 14.1 Philosophy
 
-1. **Fail fast on configuration errors** (invalid `FILESYSTEM`, etc.)
-2. **Never silently ignore rename failures**
-3. **Log all problems to CSV**
-4. **Provide summary statistics**
-5. **Graceful degradation** (Python 3 unavailable? Warn but continue)
+1. Fail fast on configuration errors (invalid `FILESYSTEM`, etc.)
+2. Never silently ignore rename failures
+3. Log all problems to CSV
+4. Provide summary statistics
+5. Graceful degradation (Python 3 unavailable? Warn but continue)
 
-### 13.2 Input Validation
+### 14.2 Input Validation
 
-**Function**: `validate_inputs()`
-
-**Checks**:
-- `FILESYSTEM` in valid set (`fat32`, `exfat`, `ntfs`, `apfs`, `hfsplus`, `universal`)
-- `SANITIZATION_MODE` in valid set (`strict`, `conservative`, `permissive`)
-- `COPY_BEHAVIOR` in valid set (`skip`, `overwrite`, `version`) if `COPY_TO` set
-- `DRY_RUN` is boolean (`true` or `false`)
-- Python 3 available (warning if missing)
+`check_dependencies()` validates:
+- Python 3 available (REQUIRED — aborts if missing)
+- Perl available (optional fallback — warns if missing)
 - Target directory exists and is readable
 
-**On validation failure**:
-- Print clear error message to stderr
-- Exit with non-zero status
-- No files are touched
+On validation failure: clear error message to stderr, exit with non-zero status, no files are touched.
 
-### 13.3 Operation-Level Errors
+### 14.3 Operation-Level Errors
 
-**Categories**:
-1. **Permission errors**: Cannot read/write file or directory
-2. **Collision errors**: Target path already exists or claimed
-3. **Path length errors**: Resulting path too long
-4. **I/O errors**: Disk full, network issues, etc.
+| Category | Handling |
+|----------|----------|
+| Permission errors | Log `FAILED` status, continue with next item |
+| Collision errors | Log `FAILED` status with collision note |
+| Path length errors | Log `FAILED` with `PathTooLong` issue flag |
+| IO errors (disk full, etc.) | Log `FAILED`, continue |
 
-**Handling**:
-- Log `FAILED` status to CSV
-- Increment appropriate counter
-- Print warning (optional)
-- Continue with next item (non-fatal)
+### 14.4 Python 3 Dependency Check
 
-**Example CSV entry**:
-```csv
-File|verylongfilename.txt|verylongfilename.txt|PathTooLong|Very/Long/Path|275|FAILED|NA|-
-```
-
-### 13.4 Python 3 Dependency Check
-
-**At startup**:
 ```bash
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "WARNING: Python 3 not found. Unicode preservation may fail." >&2
-    echo "Install Python 3 for full v12.1.2 functionality." >&2
+if ! command -v python3 &>/dev/null && ! command -v perl &>/dev/null; then
+    echo "ERROR: UTF-8 character extraction requires Python3 or Perl" >&2
+    echo "Aborting to prevent data loss." >&2
+    return 1
 fi
 ```
 
-**During execution**:
-- If Python 3 unavailable, critical functions return original input
-- Warning logged to stderr
-- Processing continues (degraded mode)
+The script **aborts** if neither Python 3 nor Perl is available — preventing silent data corruption.
 
 ---
 
-## 14. Security Considerations
+## 15. Security Considerations
 
-### 14.1 Shell Safety Mode
+### 15.1 Shell Safety Mode
 
-**Enabled via**: `CHECK_SHELL_SAFETY=true`
+Enabled via `CHECK_SHELL_SAFETY=true`. Removes dangerous shell metacharacters: `$`, `` ` ``, `&`, `;`, `#`, `~`, `^`, `!`, `(`, `)`.
 
-**Removes dangerous shell metacharacters**:
-```
-$ ` & ; # ~ ^ ! ( )
-```
-
-**Why needed**:
-- Prevents command injection if filenames used in scripts
-- Protects against shell expansion surprises
-- Important for files from untrusted sources
-
-**Example**:
 ```bash
-# Before
+# Before:
 file$(rm -rf /).sh
 
-# After (CHECK_SHELL_SAFETY=true)
-file__rm -rf ___.sh
+# After (CHECK_SHELL_SAFETY=true):
+file__rm -rf __.sh
 ```
 
-**When to use**:
-- Processing files from internet
-- Files from email attachments
-- Files that will be used in automation scripts
-- Unknown or untrusted sources
+**When to use:** Processing files from internet, email attachments, or untrusted sources; files that will be used in automation scripts.
 
-### 14.2 Unicode Exploit Detection
+### 15.2 Unicode Exploit Detection
 
-**Enabled via**: `CHECK_UNICODE_EXPLOITS=true`
+Enabled via `CHECK_UNICODE_EXPLOITS=true`. Removes zero-width and control characters:
 
-**Removes zero-width and control characters**:
-```
-U+200B  ZERO WIDTH SPACE
-U+200C  ZERO WIDTH NON-JOINER
-U+200D  ZERO WIDTH JOINER
-U+FEFF  ZERO WIDTH NO-BREAK SPACE
-```
+| Character | Unicode | Name |
+|-----------|---------|------|
+| (invisible) | U+200B | ZERO WIDTH SPACE |
+| (invisible) | U+200C | ZERO WIDTH NON-JOINER |
+| (invisible) | U+200D | ZERO WIDTH JOINER |
+| (invisible) | U+FEFF | ZERO WIDTH NO-BREAK SPACE |
 
-**Why needed**:
-- Visual spoofing attacks
-- Hidden characters in filenames
-- Homograph attacks
-- Unicode-based exploits
+Prevents visual spoofing attacks, hidden characters in filenames, and homograph attacks.
 
-**Example**:
-```bash
-# Before (contains U+200B invisible spaces)
-test​​​.pdf
+### 15.3 Control Character Stripping
 
-# After
-test.pdf
-```
+Always active in `strict` mode and NTFS. Removes ASCII control characters (0x00–0x1F) and DEL (0x7F). Prevents terminal escape exploits, log file corruption, and CSV/toolchain breakage.
 
-### 14.3 Control Character Stripping
+### 15.4 What the Script NEVER Does
 
-**Always active in `strict` mode and NTFS**
+- Never modifies file **contents**
+- Never reads file **contents**
+- Never **deletes** files or directories
+- Never follows symlinks destructively
+- Never interprets binary data
+- Never executes arbitrary code from filenames
 
-**Removes**:
-```
-0x00-0x1F  (ASCII control characters)
-0x7F       (DEL)
-```
-
-**Prevents**:
-- Terminal escape exploits
-- Log file corruption
-- CSV and toolchain breakage
-
-### 14.4 What the Script NEVER Does
-
-**Guaranteed safe operations**:
-- ✅ Never modifies file contents
-- ✅ Never reads file contents
-- ✅ Never deletes files or directories
-- ✅ Never follows symlinks destructively
-- ✅ Never interprets binary data
-- ✅ Never executes arbitrary code from filenames
-
-**Scope**: Strictly **names and paths only**
+Scope: strictly names and paths only.
 
 ---
 
-## 15. Performance Considerations
+## 16. Performance Considerations
 
-### 15.1 Bottlenecks
+### 16.1 Bottlenecks
 
-**Identified bottlenecks**:
-1. **`find` traversal** on very large trees (100,000+ files)
-2. **`grep` calls** for collision detection (O(n) per check)
-3. **CSV append operations** (file I/O per item)
-4. **Python 3 subprocess calls** (process spawn overhead)
+1. `find` traversal on very large trees (>100,000 files)
+2. `grep` calls for collision detection (O(n) per check)
+3. CSV append operations (file IO per item)
+4. Python 3 subprocess calls (~10–20ms process spawn overhead per call)
 
-### 15.2 Optimizations
+### 16.2 Current Optimizations
 
-**Current optimizations**:
 - Null-terminated `find` output (binary-safe)
-- Batched counter operations
-- System file filtering early (skip before processing)
+- System file filtering (early skip before processing)
 - Single-pass directory and file walks
 - Minimal external process calls
 
-**Future optimization opportunities**:
+### 16.3 Benchmarks
+
+Test environment: 4,074-item music library
+
+| Operation | Time | Items/sec |
+|-----------|------|-----------|
+| Full scan (dry-run) | ~15s | ~271 |
+| With rename | ~18s | ~226 |
+| With copy | ~45s | ~90 |
+| Tree generation | ~3s | — |
+
+Scalability: linear with item count. CPU-bound for dry-run; IO-bound for copy operations.
+
+### 16.4 Future Optimization Opportunities
+
 - Parallel processing (`xargs -P` or GNU `parallel`)
 - Hash-based collision detection (O(1) lookup)
 - Bulk CSV writing (batch inserts)
 - Persistent Python interpreter (avoid spawn overhead)
 
-### 15.3 Benchmarks
-
-**Test environment**: 4,074-item music library
-
-| Operation | Time | Items/sec |
-|-----------|------|-----------|
-| Full scan (dry-run) | 15s | 271 |
-| With rename | 18s | 226 |
-| With copy | 45s | 90 |
-| Tree generation | +3s | - |
-
-**Scalability**:
-- Linear with item count
-- CPU-bound (not I/O-bound for dry-run)
-- I/O-bound for copy operations
-
 ---
 
-## 16. Real-World Usage Patterns
+## 17. Real-World Usage Patterns
 
-### 16.1 Audio Library Management
+### 17.1 Audio Library Management
 
-**Scenario**: High-resolution music library for USB drive
-
-**Configuration**:
 ```bash
 FILESYSTEM=fat32 \
-SANITIZATION_MODE=conservative \
-DRY_RUN=true \
-./exfat-sanitizer-v12.1.2.sh ~/Music
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=true \
+  ./exfat-sanitizer-v12.1.4.sh ~/Music
 ```
 
-**Observations**:
-- 4,074 files scanned
-- 0 files renamed (all compliant!)
-- **All accents preserved** (French, Italian artists)
-- Only illegal characters (`<`, `>`, `:`) would be replaced
-- Typical execution time: 15 seconds
+Observations on ~4,074-file library: 0 files renamed (all compliant), all accents preserved (French, Italian artists), only illegal characters (`<`, `>`, `:`, `*`) would be replaced, typical execution time: ~15 seconds.
 
-### 16.2 Cross-Platform Sync
+### 17.2 Cross-Platform Sync
 
-**Scenario**: Mac to Windows file sharing
-
-**Configuration**:
 ```bash
 FILESYSTEM=universal \
-SANITIZATION_MODE=conservative \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh ~/SharedDocs
+  SANITIZATION_MODE=conservative \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh ~/SharedDocs
 ```
 
-**Benefits**:
-- Maximum compatibility (works everywhere)
-- Still preserves Unicode/accents
-- Removes only truly problematic characters
+Maximum compatibility — works everywhere, still preserves Unicode/accents, removes only truly problematic characters.
 
-### 16.3 Pre-Backup Validation
+### 17.3 Pre-Backup Validation
 
-**Scenario**: Validate before backup to exFAT drive
-
-**Workflow**:
 ```bash
 # 1. Generate tree snapshot (before)
-FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.2.sh ~/Data
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Data
 
 # 2. Review CSV for issues
 open sanitizer_exfat_*.csv
 
 # 3. Apply fixes if needed
-FILESYSTEM=exfat DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.2.sh ~/Data
+FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh ~/Data
 
 # 4. Generate tree snapshot (after)
-FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.2.sh ~/Data
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Data
 
 # 5. Compare snapshots
 diff tree_exfat_*_before.csv tree_exfat_*_after.csv
 ```
 
-### 16.4 Copy with Sanitization
+### 17.4 Copy with Sanitization
 
-**Scenario**: Sanitized backup to external drive
-
-**Configuration**:
 ```bash
-FILESYSTEM=fat32 \
-COPY_TO=/Volumes/Backup \
-COPY_BEHAVIOR=version \
-GENERATE_TREE=true \
-DRY_RUN=false \
-./exfat-sanitizer-v12.1.2.sh ~/Music
+FILESYSTEM=exfat \
+  COPY_TO=/Volumes/2.5ex/Musica/ \
+  COPY_BEHAVIOR=skip \
+  GENERATE_TREE=true \
+  IGNORE_FILE=./exfat-sanitizer-ignore.txt \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.4.sh ~/Music
 ```
 
-**Result**:
-- Source untouched
-- Destination has sanitized names
-- Versioning handles conflicts
-- Tree export for documentation
+Result: source untouched, destination has sanitized names, tree export for documentation.
+
+### 17.5 Post-Copy AppleDouble Cleanup
+
+After copying to exFAT/FAT32 on macOS, clean up `._` metadata files:
+
+```bash
+# Option A: Merge/clean (recommended)
+dot_clean -m /Volumes/2.5ex/Musica/
+
+# Option B: Bulk delete
+find /Volumes/2.5ex/Musica/ -name '._*' -delete
+
+# Option C: Full cleanup (._ + .DS_Store)
+find /Volumes/2.5ex/Musica/ \( -name '._*' -o -name '.DS_Store' \) -delete
+
+# Verify
+find /Volumes/2.5ex/Musica/ -name '._*' | wc -l
+# Expected: 0
+```
 
 ---
 
-## 17. Extensibility & Future Directions
+## 18. macOS AppleDouble (`._`) Files
 
-### 17.1 Plugin Architecture (Proposed)
+### 18.1 What They Are
 
-**Concept**: Pluggable sanitization pipeline
+When macOS copies files to non-APFS/HFS+ volumes (exFAT, FAT32, NTFS), it creates `._` (dot-underscore) companion files to store:
+- Extended attributes (`xattr`)
+- Resource forks
+- Finder metadata
 
-**Example configuration**:
+Each `._` file is exactly **4,096 bytes** (4KB) and mirrors the real file/folder name:
+
+```
+._1997 Elisa - Pipes and Flowers (Album)    ← 4KB metadata sidecar
+  1997 Elisa - Pipes and Flowers (Album)    ← Actual directory
+```
+
+### 18.2 Why They Appear
+
+The script's `copy_file()` function uses the `cp` command internally. macOS hooks into `cp` to automatically write AppleDouble metadata. This is **OS-level behavior, not a script bug**.
+
+### 18.3 Prevention & Cleanup
+
+| Method | Command | Scope |
+|--------|---------|-------|
+| Merge/clean | `dot_clean -m /Volumes/DRIVE/` | Per-volume (recommended) |
+| Bulk delete | `find /Volumes/DRIVE/ -name '._*' -delete` | Per-volume |
+| Full cleanup | `find /Volumes/DRIVE/ \( -name '._*' -o -name '.DS_Store' \) -delete` | Per-volume |
+| Prevent on USB | `defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true` | System-wide |
+| Prevent on network | `defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true` | System-wide |
+
+System-wide prevention requires logout/restart to take effect. To re-enable:
+
+```bash
+defaults delete com.apple.desktopservices DSDontWriteUSBStores
+defaults delete com.apple.desktopservices DSDontWriteNetworkStores
+```
+
+### 18.4 Future Improvement
+
+A future version may use `cp -X` (strip extended attributes during copy) to prevent `._` file creation at the script level.
+
+---
+
+## 19. Extensibility & Future Directions
+
+### 19.1 Plugin Architecture (Proposed)
+
+Pluggable sanitization pipeline:
+
 ```bash
 SANITIZER_STEPS="universal,controls,unicode,fs-specific,shell,reserved"
 ```
 
-**Benefits**:
-- User-configurable pipeline
-- Third-party extensions
-- A/B testing of strategies
+Benefits: user-configurable pipeline, third-party extensions, A/B testing of strategies.
 
-### 17.2 Configuration File Support (Proposed)
+### 19.2 Configuration File Support (Proposed)
 
-**Format**: INI-style configuration
+INI-style configuration:
 
-**Example** (`~/.exfat-sanitizer.conf`):
 ```ini
+# .exfat-sanitizer.conf
 [defaults]
 FILESYSTEM=fat32
 SANITIZATION_MODE=conservative
@@ -1258,7 +1169,7 @@ DRY_RUN=true
 PRESERVE_UNICODE=true
 
 [paths]
-IGNORE_FILE=~/.exfat-sanitizer-ignore
+IGNORE_FILE=.exfat-sanitizer-ignore
 
 [copy]
 COPY_BEHAVIOR=version
@@ -1268,63 +1179,49 @@ CHECK_SHELL_SAFETY=false
 CHECK_UNICODE_EXPLOITS=false
 ```
 
-### 17.3 Undo Functionality (Proposed)
+### 19.3 Undo Functionality (Proposed)
 
-**Concept**: Reverse operations using CSV log
+Reverse operations using CSV log:
 
-**Example**:
 ```bash
-./exfat-sanitizer-v12.1.2.sh --undo sanitizer_fat32_20260203_123456.csv
+./exfat-sanitizer-v12.1.4.sh --undo sanitizer_fat32_20260217_123456.csv
 ```
 
-**Implementation**:
-- Read CSV in reverse
-- For each `RENAMED` entry, rename back from New → Old
-- Validate no conflicts exist
-- Log undo operations
+Implementation: read CSV in reverse, rename from New→Old for each `RENAMED` entry, validate no conflicts.
 
-### 17.4 Parallel Processing (Proposed)
+### 19.4 Parallel Processing (Proposed)
 
-**Concept**: Multi-threaded processing for large trees
-
-**Example**:
 ```bash
-PARALLEL_JOBS=4 ./exfat-sanitizer-v12.1.2.sh ~/BigData
+PARALLEL_JOBS=4 ./exfat-sanitizer-v12.1.4.sh ~/BigData
 ```
 
-**Challenges**:
-- Collision detection needs synchronization
-- Counter updates need atomic operations
-- Directory renaming order must be preserved
+Challenges: collision detection needs synchronization, counter updates need atomic operations, directory renaming order must be preserved.
 
-### 17.5 Interactive Mode (Proposed)
+### 19.5 Interactive Mode (Proposed)
 
-**Concept**: Prompt for confirmation on each rename
-
-**Example**:
 ```bash
-./exfat-sanitizer-v12.1.2.sh --interactive ~/Music
+./exfat-sanitizer-v12.1.4.sh --interactive ~/Music
+
+# Rename "Song<test>.mp3" → "Song_test_.mp3"? [Y/n/q]
 ```
 
-**Workflow**:
-```
-Rename "Song<test>.mp3" → "Song_test_.mp3"? [Y/n/q]
-```
+### 19.6 Python-Based Sanitization (Planned)
+
+Move the character-by-character iteration from bash into Python to eliminate the UTF-8 byte-splitting issue in the current `extract_utf8_chars` → `while read` pipeline. This would natively handle all multibyte Unicode sequences without corruption risk.
 
 ---
 
-## 18. Developer Notes
+## 20. Developer Notes
 
-### 18.1 Code Style
+### 20.1 Code Style
 
-**Conventions**:
+Conventions:
 - `snake_case` for function names
-- `UPPER_CASE` for constants and environment variables
+- `UPPERCASE` for constants and environment variables
 - `readonly` for true constants
 - `local` for all function-scope variables
-- `set -e` to fail fast on errors (disabled in specific sections)
+- `set -o pipefail` to fail on pipeline errors
 
-**Example**:
 ```bash
 readonly DEFAULT_FILESYSTEM="fat32"
 
@@ -1335,85 +1232,88 @@ sanitize_filename() {
 }
 ```
 
-### 18.2 Testing Strategy
+### 20.2 Testing Strategy
 
-**Recommended test categories**:
+Recommended test categories:
 
-1. **Unit tests**: Individual function testing
-   - `sanitize_filename()` input/output
-   - `normalize_apostrophes()` edge cases
-   - `extract_utf8_chars()` Unicode handling
+1. **Unit tests** — Individual function testing:
+   - `sanitize_filename` input/output pairs
+   - `normalize_apostrophes` edge cases
+   - `extract_utf8_chars` Unicode handling
+   - `is_illegal_char` character classification (v12.1.4 fix)
+   - `normalize_unicode` NFD→NFC (v12.1.3+ fix)
 
-2. **Integration tests**: Full tree runs
+2. **Integration tests** — Full tree runs:
    - Empty directories
-   - Deep nesting (>10 levels)
+   - Deep nesting (10+ levels)
    - Large trees (10,000+ items)
 
-3. **Edge case tests**:
-   - Filenames with only forbidden characters (`<<<<.txt`)
-   - Already-reserved names (`CON.txt`)
-   - Unicode edge cases (NFD vs NFC, combining characters)
+3. **Edge case tests:**
+   - Filenames with only forbidden characters → `___.txt`
+   - Already-reserved names: `CON.txt`
+   - Unicode edge cases: NFD vs NFC, combining characters
    - Zero-length filenames
    - Maximum path lengths
 
-4. **Regression tests** (v12.1.2 specific):
-   - Accent preservation (`Loïc`, `Révérence`)
-   - Apostrophe normalization (`L'été`)
-   - Mixed accents and illegal chars (`Café<test>.mp3`)
+4. **Regression tests (v12.1.4 specific):**
+   - Accent preservation: `Loïc`, `Révérence`, `Cè di più`
+   - Apostrophe normalization: `L'été`
+   - Mixed accents and illegal chars: `Café<test>.mp3`
+   - NFD filenames from macOS don't trigger false renames
+   - Conditional logic: legal chars preserved, illegal chars replaced
 
-### 18.3 Debugging Tips
+### 20.3 Debugging Tips
 
-**Enable verbose output**:
 ```bash
-bash -x ./exfat-sanitizer-v12.1.2.sh ~/Music 2>&1 | head -100
-```
+# Enable verbose output
+bash -x ./exfat-sanitizer-v12.1.4.sh ~/Music 2>&1 | head -100
 
-**Check Python 3 availability**:
-```bash
+# Check Python 3 availability
 command -v python3 && python3 --version
-```
 
-**Test individual functions**:
-```bash
-# Extract and test normalize_apostrophes()
+# Test normalize_apostrophes
 python3 << 'EOF'
 import sys
-text = "Loïc Nottet's Song"
-replacements = {
-    '\u2018': "'",
-    '\u2019': "'",
-}
+text = "Loïc Nottet\u2019s Song"
+replacements = {'\u2018': "'", '\u2019': "'"}
 for old, new in replacements.items():
     text = text.replace(old, new)
 print(text)
 EOF
+
+# Test normalize_unicode
+python3 -c "
+import unicodedata
+nfd = 'Cafe\u0300'  # NFD: e + combining grave
+nfc = unicodedata.normalize('NFC', nfd)
+print(f'NFD: {repr(nfd)} → NFC: {repr(nfc)}')
+print(f'Equal: {nfd == nfc}')
+"
+
+# Enable DEBUG_UNICODE
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music 2>debug.log
+grep "MISMATCH" debug.log
 ```
 
-**Inspect temp counters**:
-```bash
-ls -la /tmp/exfat-sanitizer-*/
-cat /tmp/exfat-sanitizer-*/scanned_files
-```
+### 20.4 Contributing Guidelines
 
-### 18.4 Contributing Guidelines
+Before submitting a pull request:
+1. Test on at least macOS and Linux
+2. Verify Python 3 dependency is documented
+3. Update version number and CHANGELOG
+4. Add tests for new features
+5. Document new configuration variables
+6. Follow existing code style
+7. Preserve backward compatibility when possible
 
-**Before submitting a pull request**:
+**Pull request template:**
 
-1. **Test** on at least macOS and Linux
-2. **Verify** Python 3 dependency is documented
-3. **Update** version number and CHANGELOG
-4. **Add** tests for new features
-5. **Document** new configuration variables
-6. **Follow** existing code style
-7. **Preserve** backward compatibility when possible
-
-**Pull request template**:
 ```markdown
 ## Description
-[Brief description of change]
+Brief description of change
 
 ## Motivation
-[Why this change is needed]
+Why this change is needed
 
 ## Testing
 - [ ] Tested on macOS
@@ -1430,201 +1330,150 @@ cat /tmp/exfat-sanitizer-*/scanned_files
 
 ---
 
-## 19. Glossary
+## 21. Frequently Asked Questions (Technical)
 
-### Technical Terms
+**Q1: Why Python 3 instead of pure bash?**
 
-- **Forbidden Characters**: Characters that a given filesystem does not allow in file or directory names
-- **Reserved Names**: Filenames that have special meaning (e.g., Windows DOS device names)
-- **Sanitization**: Process of transforming names to conform to filesystem rules
-- **Dry Run**: Preview mode where no actual changes occur, only logs produced
-- **CSV Log**: Comma-separated (pipe-delimited) file containing detailed record of operations
-- **Tree Export**: CSV representation of directory hierarchy structure
-- **Shell Metacharacters**: Characters with special meaning to shells (e.g., `$`, `&`, `;`)
-- **Unicode Normalization**: Converting between NFD (decomposed) and NFC (composed) forms
-- **Long Filename (LFN)**: FAT32/exFAT extension supporting UTF-16LE filenames up to 255 chars
-- **NFD**: Normalized Form Decomposed (e.g., `é` = `e` + combining accent)
-- **NFC**: Normalized Form Composed (e.g., `é` = single code point)
+Bash string operations are byte-oriented, not character-oriented. They corrupt multi-byte UTF-8 sequences. Python handles Unicode natively and correctly.
 
-### Status Values
-
-- **LOGGED**: Item checked, no changes needed (compliant)
-- **RENAMED**: Item was or will be renamed (non-compliant)
-- **FAILED**: Operation failed (collision, permissions, path length)
-- **COPIED**: File successfully copied to destination
-- **SKIPPED**: Copy skipped due to conflict resolution rule
-- **NA**: Not applicable (copy mode not in use)
-
----
-
-## 20. Frequently Asked Questions (Technical)
-
-### Q1: Why Python 3 instead of pure bash?
-
-**A**: Bash string operations are **not UTF-8 safe**. They operate on bytes, not characters. This causes corruption when handling multi-byte UTF-8 sequences. Python 3 handles Unicode natively and correctly.
-
-**Example of bash corruption**:
 ```bash
-text="Loïc"
-echo "${text//ï/i}"  # May corrupt UTF-8 byte sequence
-# Result: "Loc" or worse (byte-level operation)
+# Bash (BROKEN): byte-level operation
+text="Loïc"; echo "${text/ï/i}"  # May corrupt UTF-8
+
+# Python (CORRECT): character-level operation
+text = "Loïc"; text = text.replace("ï", "i")  # Works correctly
 ```
 
-**Python 3 correct handling**:
-```python
-text = "Loïc"
-text = text.replace("ï", "i")
-# Result: "Loic" (character-level operation)
-```
+**Q2: Why not use `sed` or `tr` for character replacement?**
 
-### Q2: Why not use `sed` or `tr` for character replacement?
+`sed` and `tr` are also byte-oriented, not character-oriented. They can corrupt multi-byte UTF-8 sequences.
 
-**A**: `sed` and `tr` are also byte-oriented, not character-oriented. They can corrupt multi-byte UTF-8 sequences.
+**Q3: Why use `set -o pipefail`?**
 
-**Example**:
-```bash
-echo "Loïc" | tr "'" "'"  # May corrupt ï
-```
+Ensures pipeline errors are caught. Without it, `cmd1 | cmd2` succeeds even if `cmd1` fails.
 
-### Q3: How does the script handle macOS NFD vs Windows NFC?
+**Q4: What's the performance impact of Python 3 calls?**
 
-**A**: The `normalize_unicode()` function converts NFD to NFC using:
-1. Python 3 `unicodedata.normalize('NFC', text)`
-2. Or `uconv -x "::NFD; ::NFC;"`
-3. Or Perl `Unicode::Normalize::NFC($text)`
+Moderate. Each Python 3 call spawns a subprocess (~10–20ms overhead). For 4,000 files, this adds ~40–80 seconds total. Optimization opportunity: persistent Python interpreter or batch processing.
 
-This ensures filenames are compatible across platforms.
+**Q5: Can I use the script without Python 3?**
 
-### Q4: What's the performance impact of Python 3 calls?
+Not recommended for v12.1.4. Critical functions (`extract_utf8_chars`, `normalize_apostrophes`, `normalize_unicode`) require Python 3 for Unicode safety. The script aborts if neither Python 3 nor Perl is available.
 
-**A**: Moderate. Each Python 3 call spawns a subprocess (~10-20ms overhead). For 4,000 files, this adds ~40-80 seconds total.
+**Q6: How does NFD/NFC normalization work?**
 
-**Optimization opportunity**: Persistent Python interpreter or batch processing.
+macOS stores `è` as `e` + combining grave accent (2 code points = NFD). Windows stores `è` as a single code point (NFC). `normalize_unicode()` converts both to NFC so they compare as equal. Without this, every accented file on macOS would show as `RENAMED` (false positive).
 
-### Q5: Can I use the script without Python 3?
+**Q7: How does bottom-up directory renaming work?**
 
-**A**: Not recommended for v12.1.2. Critical functions (`extract_utf8_chars`, `normalize_apostrophes`) require Python 3 for Unicode safety. The script will warn and degrade functionality.
-
-### Q6: Why not use Perl instead of Python 3?
-
-**A**: Perl with `Unicode::Normalize` module works, but:
-- Python 3 is more commonly installed (especially on modern macOS)
-- Python 3 has clearer Unicode semantics
-- Python 3 code is more maintainable
-
-Perl is supported as a **fallback** for `normalize_unicode()`.
-
-### Q7: How does bottom-up directory renaming work exactly?
-
-**A**: 
 1. `find` generates list of all directories
-2. `sort -r` reverses the list (deepest paths first)
+2. Sort in reverse (deepest paths first)
 3. Process each directory from deepest to shallowest
 4. This ensures child paths are valid when parents are renamed
 
-**Example**:
-```
-/a/b/c  → process first
-/a/b    → process second
-/a      → process last
-```
+**Q8: What happens if two files sanitize to the same name?**
 
-### Q8: What happens if two files sanitize to the same name?
+The second file gets `FAILED` status and is not renamed. The `is_path_used()` function detects the collision:
 
-**A**: The second file gets `FAILED` status and is not renamed. The `is_path_used()` function detects the collision.
-
-**CSV output**:
 ```csv
-File|song<1>.mp3|song_1_.mp3|IllegalChar|Music|30|RENAMED|NA|-
-File|song:1?.mp3|song_1_.mp3|IllegalChar|Music|30|FAILED|NA|Collision
+File|song<1>.mp3|song_1_.mp3|IllegalChar|Music/|30|RENAMED|NA|-
+File|song?1?.mp3|song_1_.mp3|IllegalChar|Music/|30|FAILED|NA|Collision
 ```
 
-### Q9: Why use temp files for counters instead of variables?
+**Q9: Why use temp files for counters instead of variables?**
 
-**A**: Bash pipelines create subshells. Variables modified in subshells don't propagate to the parent shell. Temp files provide a shared state mechanism.
+Bash pipelines create subshells. Variables modified in subshells don't propagate to the parent shell. Temp files provide a shared state mechanism.
 
-**Example problem**:
-```bash
-count=0
-find . -type f | while read file; do
-    count=$((count + 1))
-done
-echo $count  # Always prints 0! (subshell isolation)
-```
+**Q10: Is the script safe for production use?**
 
-**Solution**:
-```bash
-echo "0" > /tmp/count
-find . -type f | while read file; do
-    echo $(($(cat /tmp/count) + 1)) > /tmp/count
-done
-cat /tmp/count  # Correct count
-```
+Yes, with caveats: always test with `DRY_RUN=true` first; backup critical data before applying changes; review CSV logs carefully; verify Python 3 is installed; test on a subset of data first. The script never deletes files and provides complete audit logs.
 
-### Q10: Is the script safe for production use?
+**Q11: What about the `._` (AppleDouble) files on exFAT?**
 
-**A**: Yes, with caveats:
-- **Always** test with `DRY_RUN=true` first
-- **Backup** critical data before applying changes
-- **Review** CSV logs carefully
-- **Verify** Python 3 is installed for v12.1.2
-- **Test** on a subset of data first
-
-The script never deletes files and provides complete audit logs.
+These are created by macOS, not by the script. See [Section 18: macOS AppleDouble Files](#18-macos-appledouble-_-files) for cleanup options.
 
 ---
 
-## 21. Summary
+## 22. Glossary
 
-`exfat-sanitizer` v12.1.2 represents a mature, production-ready tool for cross-platform filename sanitization with comprehensive Unicode support.
+### Technical Terms
+
+| Term | Definition |
+|------|-----------|
+| **Forbidden Characters** | Characters that a given filesystem does not allow in file or directory names |
+| **Reserved Names** | Filenames with special meaning (e.g., Windows DOS device names: CON, PRN, NUL) |
+| **Sanitization** | Process of transforming names to conform to filesystem rules |
+| **Dry Run** | Preview mode where no actual changes occur — only logs produced |
+| **CSV Log** | Pipe-delimited file containing detailed record of operations |
+| **Tree Export** | CSV representation of directory hierarchy structure |
+| **Shell Metacharacters** | Characters with special meaning to shells (e.g., `$`, `` ` ``, `&`) |
+| **Unicode Normalization** | Converting between NFD (decomposed) and NFC (composed) forms |
+| **Long Filename (LFN)** | FAT32/exFAT extension supporting UTF-16LE filenames up to 255 chars |
+| **NFD** | Normalized Form Decomposed — e.g., `è` = `e` + combining accent |
+| **NFC** | Normalized Form Composed — e.g., `è` = single code point |
+| **AppleDouble** | macOS `._` companion files storing resource forks and extended attributes |
+
+### Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `LOGGED` | Item checked, no changes needed (compliant) |
+| `RENAMED` | Item was (or will be) renamed (non-compliant) |
+| `IGNORED` | Item matched an ignore pattern |
+| `FAILED` | Operation failed (collision, permissions, path length) |
+| `COPIED` | File successfully copied to destination |
+| `SKIPPED` | Copy skipped due to conflict resolution rule |
+| `NA` | Not applicable (copy mode not in use) |
+
+---
+
+## 23. Summary
 
 ### Key Characteristics
 
-**Technical Excellence**:
-- Multi-filesystem aware rules
+**Technical Excellence:**
+- Multi-filesystem aware rules (6 filesystem modes)
 - Python 3-based Unicode handling
 - Safe apostrophe normalization (v12.1.2 fix)
+- Correct character classification logic (v12.1.4 fix)
+- NFD→NFC normalization (v12.1.3+ fix)
 - Configurable sanitization pipeline
 - Rich logging and audit trail
 
-**Safety-First Design**:
+**Safety-First Design:**
 - Default dry-run mode
 - Never deletes files
 - Collision detection
 - Complete CSV logs
 - Conservative path limits
 
-**Unicode Support** (v12.x):
+**Unicode Support (v12.x):**
 - Preserves all accented characters
-- FAT32 LFN UTF-16 support documented
+- FAT32 LFN (UTF-16) support documented
 - Python 3-based UTF-8 safety
 - NFD/NFC normalization
 - Explicit Unicode code points
+- DEBUG_UNICODE diagnostic mode
 
-**Production Features**:
+**Production Features:**
 - System file filtering
+- Ignore pattern support
 - Copy mode with versioning
 - Tree generation
-- Progress reporting
 - Error handling and recovery
+- AppleDouble cleanup guidance
 
 ### Recommended Reading Order
 
-1. **README.md** - Overview and quick start
-2. **QUICK-START-v12.1.2.md** - Step-by-step guide
-3. **RELEASE-v12.1.2.md** - What's new and critical fixes
-4. **DOCUMENTATION.md** (this file) - Deep technical dive
-5. **CHANGELOG-v12.1.2.md** - Complete version history
-
-### Support & Contributing
-
-- **Issues**: https://github.com/fbaldassarri/exfat-sanitizer/issues
-- **Discussions**: https://github.com/fbaldassarri/exfat-sanitizer/discussions
-- **Repository**: https://github.com/fbaldassarri/exfat-sanitizer
-- **License**: MIT
+1. [README.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/README.md) — Overview and quick start
+2. [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md) — Step-by-step guide
+3. [RELEASE-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.4.md) — What's new and critical fixes
+4. **DOCUMENTATION.md** (this file) — Deep technical dive
+5. [CHANGELOG-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.4.md) — Complete version history
 
 ---
 
-*Last updated: February 3, 2026 (v12.1.2)*  
-*Maintainer: [fbaldassarri](https://github.com/fbaldassarri)*  
-*Repository: https://github.com/fbaldassarri/exfat-sanitizer*
+**Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
+**License:** MIT
+**Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)
+**Version:** 12.1.4 | **Release Date:** February 17, 2026
