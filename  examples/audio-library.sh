@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Audio Library Sanitizer for exFAT Drive
-# Uses exfat-sanitizer v12.1.4
+# Uses exfat-sanitizer v12.1.6
 
 # Configuration
 FILESYSTEM=exfat
@@ -18,16 +18,16 @@ echo ""
 FILESYSTEM=$FILESYSTEM \
   SANITIZATION_MODE=$SANITIZATION_MODE \
   DRY_RUN=$DRY_RUN \
-  ./exfat-sanitizer-v12.1.4.sh "$SOURCE_DIR"
+  ./exfat-sanitizer-v12.1.6.sh "$SOURCE_DIR"
 
 echo ""
 echo "Audio library sanitized for exFAT drive"
 echo ""
-echo "What was preserved (v12.1.4 Unicode-safe!):"
+echo "What was preserved (v12.1.6 Unicode-safe!):"
 echo "  ✅ Café del Mar.mp3"
 echo "  ✅ L'interprète.flac"
 echo "  ✅ Müller - España.wav"
-echo "  ✅ Loïc Nottet's Song.flac  (v12.1.4 FIX! apostrophe + accent)"
+echo "  ✅ Loïc Nottet's Song.flac  (apostrophe + accent preserved)"
 echo "  ✅ C'è di più.ogg  (Accents preserved!)"
 echo ""
 echo "What was sanitized:"

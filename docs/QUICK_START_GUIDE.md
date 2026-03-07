@@ -1,6 +1,6 @@
 # exfat-sanitizer — Quick Start Guide
 
-**Version 12.1.4** — Get started in 5 minutes. No complex setup required!
+**Version 12.1.6** — Get started in 5 minutes. No complex setup required!
 
 **Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
 
@@ -8,22 +8,22 @@
 
 ## 30-Second Overview
 
-**What It Does:** Safely renames files and folders to work across different devices (Mac, Windows, Linux, USB drives, etc.) while preserving accented characters (à, è, é, ì, ò, ù, ö, ü, ï, ê, etc.).
+**What It Does:** Safely renames files and folders to work across different devices (Mac, Windows, Linux, USB drives, etc.) while preserving accented characters (à, è, é, ì, ò, ù, È, ö, ü, ï, ê, etc.).
 
 **Who Needs It:** Anyone syncing files between different computers or devices who encounters:
 - Files disappearing or failing during copy
 - Sync failures between devices
 - Cryptic error messages about filenames
 - Problems reading files on different OS/hardware
-- Needs to keep international characters intact (Loïc, Révérence, Cè di più)
+- Needs to keep international characters intact (Loïc, Révérence, Cè di più, Èssere)
 
-**How It Works:** Preview all changes in a safe dry-run mode first, then apply changes when you're satisfied.
+**How It Works:** Preview all changes in a safe dry-run mode first, then apply changes when you're satisfied. Or use **Interactive Mode** to decide each rename manually.
 
-**What's New in v12.1.4:**
-- Fixed inverted conditional logic in `sanitize_filename()`
-- NFD→NFC normalization improvements for macOS
-- `DEBUG_UNICODE` mode for diagnostics
-- AppleDouble (`._` file) cleanup guidance
+**What's New in v12.1.6:**
+- **Critical fix:** Multibyte UTF-8 characters (È, è, à, ì, ò, ù) no longer silently dropped on macOS
+- **Critical fix:** Straight apostrophe `'` now correctly preserved on all filesystems
+- **New feature:** Interactive Mode (`INTERACTIVE=true`) for operator-driven rename decisions
+- **Architecture:** Sanitization pipeline rewritten in Python for native Unicode safety
 
 ---
 
@@ -33,17 +33,17 @@
 
 ```bash
 # Download the latest version
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.4/exfat-sanitizer-v12.1.4.sh
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
 
 # Make it executable
-chmod +x exfat-sanitizer-v12.1.4.sh
+chmod +x exfat-sanitizer-v12.1.6.sh
 
 # Verify Python 3 is installed (REQUIRED)
 python3 --version
 # Should show Python 3.6 or higher
 
 # Test the script
-./exfat-sanitizer-v12.1.4.sh ~/Music
+./exfat-sanitizer-v12.1.6.sh ~/Music
 # Expected: configuration info displayed and a CSV file created
 ```
 
@@ -67,7 +67,7 @@ sudo dnf install python3
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.4.sh /path/to/your/files
+  ./exfat-sanitizer-v12.1.6.sh /path/to/your/files
 ```
 
 Replace `/path/to/your/files` with your actual directory — e.g., `~/Music`, `/Volumes/USBDRIVE`, `~/Documents`.
@@ -75,12 +75,12 @@ Replace `/path/to/your/files` with your actual directory — e.g., `~/Music`, `/
 **What you'll see:**
 
 ```
-EXFAT-SANITIZER v12.1.4
-BUG FIX v12.1.4: Inverted logic FIXED - accents now preserved!
+EXFAT-SANITIZER v12.1.6
 Scanning /path/to/your/files
 Filesystem: fat32
 Sanitization Mode: conservative
 Dry Run: true
+Interactive: false
 Preserve Unicode: true
 ...
 SUMMARY
@@ -124,10 +124,66 @@ If happy with the preview:
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh /path/to/your/files
+  ./exfat-sanitizer-v12.1.6.sh /path/to/your/files
 ```
 
 > **Safety Note:** The script never deletes files — it only renames them. The CSV log records old→new names if you ever need to undo.
+
+---
+
+## Interactive Mode (New in v12.1.6)
+
+Interactive Mode gives you full control over every rename. Instead of auto-renaming, the script prompts you for each file or folder that needs a change.
+
+### Basic Usage
+
+```bash
+# Interactive mode with live changes
+INTERACTIVE=true \
+  FILESYSTEM=exfat \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
+
+# Interactive mode preview (no changes applied — safe!)
+INTERACTIVE=true \
+  DRY_RUN=true \
+  FILESYSTEM=exfat \
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
+```
+
+### What You'll See
+
+For each item needing a rename:
+
+```
+── Interactive Rename ──────────────────────
+  Type:      File
+  Current:   My Song: A Remix?.flac
+  Suggested: My Song_ A Remix_.flac
+────────────────────────────────────────────
+  Enter new name (or press Enter to accept suggested):
+```
+
+### How It Works
+
+- **Press Enter** to accept the auto-suggested name
+- **Type a custom name** to use your own replacement
+- If your custom name contains illegal characters, you'll be warned and re-prompted:
+  ```
+  ⚠️  Invalid! Illegal characters for exfat found: : ?
+  Please try again.
+  ```
+- Windows reserved names (CON, PRN, AUX, NUL, etc.) are rejected on FAT32/universal
+- Empty names or names consisting only of spaces/dots are rejected
+
+### When to Use Interactive Mode
+
+- **Large music libraries** with international characters where you want to verify each rename
+- **Mixed-language collections** where auto-suggestions might not match your preference
+- **First-time runs** to understand what the script would change before trusting auto-mode
+- **Sensitive directories** where every rename needs human approval
+
+> **Tip:** Combine `INTERACTIVE=true` with `DRY_RUN=true` for a completely safe preview of the interactive workflow.
 
 ---
 
@@ -142,7 +198,7 @@ Copy your music collection to a USB drive with accents preserved:
 FILESYSTEM=exfat \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Step 2: Review the CSV
 open sanitizer_exfat_*.csv
@@ -151,7 +207,7 @@ open sanitizer_exfat_*.csv
 FILESYSTEM=exfat \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Step 4: Copy to USB
 cp -r ~/Music /Volumes/USBDRIVE/
@@ -161,13 +217,13 @@ cp -r ~/Music /Volumes/USBDRIVE/
 - `Loïc Nottet` → `Loïc Nottet` ✅
 - `Révérence.flac` → `Révérence.flac` ✅
 - `Cè di più.flac` → `Cè di più.flac` ✅
+- `Èssere o non Èssere.flac` → `Èssere o non Èssere.flac` ✅
 - `Café del Mar.mp3` → `Café del Mar.mp3` ✅
+- `dell'Amore.flac` → `dell'Amore.flac` ✅
 
 **What gets fixed:**
 - `Song<Test>.mp3` → `Song_Test_.mp3` (angle brackets illegal in FAT32)
 - `Album*.zip` → `Album_.zip` (asterisk illegal in FAT32)
-
-**Time:** ~5–10 minutes
 
 ### Scenario 2: Sanitize + Copy to External Drive
 
@@ -178,22 +234,44 @@ FILESYSTEM=exfat \
   COPY_TO=/Volumes/USBDRIVE/Musica/ \
   COPY_BEHAVIOR=skip \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
-With ignore file and tree snapshot:
+With ignore file, tree snapshot, and interactive mode:
 
 ```bash
 FILESYSTEM=exfat \
   COPY_TO=/Volumes/USBDRIVE/Musica/ \
   COPY_BEHAVIOR=skip \
   GENERATE_TREE=true \
+  INTERACTIVE=true \
   IGNORE_FILE=./exfat-sanitizer-ignore.txt \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
-### Scenario 3: Generate Directory Snapshot
+### Scenario 3: Interactive Review Before Applying
+
+Preview every rename interactively without making changes:
+
+```bash
+INTERACTIVE=true \
+  DRY_RUN=true \
+  FILESYSTEM=exfat \
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
+```
+
+Then, when satisfied, apply with auto-mode or interactive mode:
+
+```bash
+# Auto-mode (faster for large libraries)
+FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+
+# Or interactive mode (operator chooses each name)
+INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+```
+
+### Scenario 4: Generate Directory Snapshot
 
 Export your directory tree before making changes:
 
@@ -201,11 +279,11 @@ Export your directory tree before making changes:
 GENERATE_TREE=true \
   FILESYSTEM=fat32 \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 # Output: tree_fat32_YYYYMMDD_HHMMSS.csv
 ```
 
-### Scenario 4: Copy with Versioning
+### Scenario 5: Copy with Versioning
 
 Smart backup with automatic version control:
 
@@ -214,7 +292,7 @@ FILESYSTEM=fat32 \
   COPY_TO=/Volumes/Backup/ \
   COPY_BEHAVIOR=version \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 Result on repeated runs:
@@ -222,7 +300,7 @@ Result on repeated runs:
 - 2nd run: `song.mp3` → `/Volumes/Backup/song-v1.mp3`
 - 3rd run: `song.mp3` → `/Volumes/Backup/song-v2.mp3`
 
-### Scenario 5: Syncing Between Mac and Windows
+### Scenario 6: Syncing Between Mac and Windows
 
 Files work on Mac but not on Windows:
 
@@ -231,18 +309,18 @@ Files work on Mac but not on Windows:
 FILESYSTEM=universal \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.4.sh ~/Documents
+  ./exfat-sanitizer-v12.1.6.sh ~/Documents
 
 # Apply when ready
 FILESYSTEM=universal \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Documents
+  ./exfat-sanitizer-v12.1.6.sh ~/Documents
 ```
 
 `universal` mode applies the most restrictive rules — works everywhere.
 
-### Scenario 6: Maximum Security for Downloads
+### Scenario 7: Maximum Security for Downloads
 
 Files from the internet with suspicious or dangerous characters:
 
@@ -252,7 +330,7 @@ FILESYSTEM=universal \
   CHECK_SHELL_SAFETY=true \
   CHECK_UNICODE_EXPLOITS=true \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Downloads
+  ./exfat-sanitizer-v12.1.6.sh ~/Downloads
 ```
 
 Protects against:
@@ -294,7 +372,16 @@ DRY_RUN=false    # Actually make changes
 
 > **Pro Tip:** Always run with `DRY_RUN=true` first!
 
-### Unicode Preservation (v12.x)
+### Interactive Mode (v12.1.6)
+
+```bash
+INTERACTIVE=false    # Auto-rename (DEFAULT — existing behavior)
+INTERACTIVE=true     # Prompt for each rename decision
+```
+
+> **Pro Tip:** Combine `INTERACTIVE=true` with `DRY_RUN=true` to safely preview the interactive workflow without any changes.
+
+### Unicode Preservation
 
 ```bash
 PRESERVE_UNICODE=true         # Keep accented characters (DEFAULT)
@@ -319,17 +406,20 @@ REPLACEMENT_CHAR=_                    # Character for replacing illegal chars
 
 ## What Gets Fixed vs. Preserved
 
-### Preserved (v12.1.4)
+### Preserved (v12.1.6)
 
-Accented characters are preserved via FAT32 LFN (UTF-16) support:
+Accented characters and apostrophes are fully preserved via Python-based Unicode-safe sanitization:
 
 ```
 Loïc Nottet.flac       → PRESERVED ✅
 Révérence.flac         → PRESERVED ✅
 Cè di più.flac         → PRESERVED ✅  (à, è, ì, ò, ù)
+Èssere o non Èssere    → PRESERVED ✅  (È now fully safe!)
 Café del Mar.mp3       → PRESERVED ✅
 Müller - España.wav    → PRESERVED ✅  (ä, ö, ü, ñ)
 L'interprète.flac      → PRESERVED ✅
+dell'Amore.flac        → PRESERVED ✅  (apostrophe preserved!)
+Cos'è la vita.mp3      → PRESERVED ✅  (apostrophe + accents!)
 Beaux rêves.flac       → PRESERVED ✅
 ```
 
@@ -349,12 +439,13 @@ Path\File.doc          → Path_File.doc     (\ illegal in FAT32)
 
 ### Comparison Table
 
-| Input | v9.0.2.2 (Broken) | v12.1.4 (Fixed) | Status |
-|-------|-------------------|-----------------|--------|
-| `Loïc Nottet.flac` | `Loic Nottet.flac` | `Loïc Nottet.flac` | `LOGGED` |
-| `Révérence.mp3` | `Reverence.mp3` | `Révérence.mp3` | `LOGGED` |
+| Input | v12.1.5 and earlier | v12.1.6 (Fixed) | Status |
+|-------|---------------------|-----------------|--------|
+| `Loïc Nottet.flac` | `Loïc Nottet.flac` | `Loïc Nottet.flac` | `LOGGED` |
+| `Èssere.flac` | `ssere.flac` ❌ | `Èssere.flac` | `LOGGED` |
+| `dell'Amore.flac` | `dellAmore.flac` ❌ | `dell'Amore.flac` | `LOGGED` |
+| `Cos'è.mp3` | `Cos.mp3` ❌ | `Cos'è.mp3` | `LOGGED` |
 | `Song<Test>.mp3` | `Song_Test_.mp3` | `Song_Test_.mp3` | `RENAMED` |
-| `Album*.zip` | `Album_.zip` | `Album_.zip` | `RENAMED` |
 
 ---
 
@@ -430,7 +521,7 @@ NOTE.txt
 ### Usage
 
 ```bash
-IGNORE_FILE=./exfat-sanitizer-ignore.txt ./exfat-sanitizer-v12.1.4.sh ~/Music
+IGNORE_FILE=./exfat-sanitizer-ignore.txt ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 A ready-to-use example file is included in the repository: [`exfat-sanitizer-ignore.example.txt`](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/exfat-sanitizer-ignore.example.txt)
@@ -467,7 +558,7 @@ cp -r ~/Music ~/Music_Backup
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ### Step 5: Check the CSV output
@@ -488,11 +579,21 @@ open sanitizer_fat32_*.csv
 
 ### Step 6: Apply changes
 
+Choose between auto-mode or interactive mode:
+
 ```bash
+# Auto-mode (recommended for large libraries)
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
+
+# Or interactive mode (review each rename individually)
+FILESYSTEM=fat32 \
+  SANITIZATION_MODE=conservative \
+  INTERACTIVE=true \
+  DRY_RUN=false \
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ### Step 7: Verify changes
@@ -520,9 +621,11 @@ cp -r ~/Music /Volumes/USBDRIVE/
 | Download & setup | ~1 min | Internet connection |
 | Preview (dry-run) | ~15–30 sec | 100–10,000 files |
 | Review CSV | ~1 min | Text editor |
-| Apply changes | ~15–30 sec | Review complete |
+| Apply changes (auto) | ~15–30 sec | Review complete |
+| Apply changes (interactive) | ~5–15 min | Depends on rename count |
 | Copy to USB | ~5–30 min | Depends on file size |
-| **Total** | **~10–40 min** | **Start to finish** |
+| **Total (auto)** | **~10–40 min** | **Start to finish** |
+| **Total (interactive)** | **~15–60 min** | **Start to finish** |
 
 ---
 
@@ -530,28 +633,31 @@ cp -r ~/Music /Volumes/USBDRIVE/
 
 ```bash
 # Most common: Audio library for USB (accents preserved!)
-FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music
+FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+
+# Interactive mode: Review each rename
+INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Maximum compatibility (Mac ↔ Windows)
-FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Documents
+FILESYSTEM=universal SANITIZATION_MODE=conservative DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Documents
 
 # Maximum security (untrusted files)
-FILESYSTEM=universal SANITIZATION_MODE=strict CHECK_SHELL_SAFETY=true CHECK_UNICODE_EXPLOITS=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Downloads
+FILESYSTEM=universal SANITIZATION_MODE=strict CHECK_SHELL_SAFETY=true CHECK_UNICODE_EXPLOITS=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Downloads
 
 # With directory tree export
-FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music
+FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Copy mode with versioning
-FILESYSTEM=fat32 COPY_TO=/Volumes/Backup COPY_BEHAVIOR=version DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh ~/Music
+FILESYSTEM=fat32 COPY_TO=/Volumes/Backup COPY_BEHAVIOR=version DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
 
-# Copy to exFAT drive with ignore file
-FILESYSTEM=exfat COPY_TO=/Volumes/USBDRIVE/Musica/ IGNORE_FILE=./exfat-sanitizer-ignore.txt DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh ~/Music
+# Copy to exFAT drive with ignore file + interactive
+FILESYSTEM=exfat COPY_TO=/Volumes/USBDRIVE/Musica/ INTERACTIVE=true IGNORE_FILE=./exfat-sanitizer-ignore.txt DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Debug Unicode normalization
-DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music 2>debug.log
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music 2>debug.log
 
 # Apply changes after testing!
-FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh ~/Music
+FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ---
@@ -565,14 +671,14 @@ FILESYSTEM=fat32 SANITIZATION_MODE=conservative DRY_RUN=false ./exfat-sanitizer-
 cp -r ~/Music ~/Music_Backup
 
 # Then test on original
-FILESYSTEM=fat32 DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music
+FILESYSTEM=fat32 DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ### Tip 2: Generate Tree Snapshot
 
 ```bash
 # See directory structure before changes
-GENERATE_TREE=true FILESYSTEM=fat32 DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music
+GENERATE_TREE=true FILESYSTEM=fat32 DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
 # Creates: tree_fat32_YYYYMMDD_HHMMSS.csv — complete directory tree
 ```
 
@@ -584,7 +690,7 @@ FILESYSTEM=fat32 \
   COPY_TO=/Volumes/Backup \
   COPY_BEHAVIOR=version \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ### Tip 4: Automate Regular Cleanups
@@ -596,7 +702,7 @@ cat > sanitize-music.sh << 'EOF'
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 echo "Sanitization complete on $(date)" >> ~/Music_Cleanup.log
 EOF
 
@@ -607,17 +713,29 @@ chmod +x sanitize-music.sh
 ### Tip 5: Test Accent Preservation
 
 ```bash
-# Create test files to verify
+# Create test files to verify (using Python for proper Unicode)
 mkdir -p /tmp/test-accents && cd /tmp/test-accents
-touch "Loïc Nottet.flac"
-touch "Révérence.mp3"
-touch "Cè di più.wav"
+python3 -c "
+for name in ['Loïc Nottet.flac', 'Révérence.mp3', 'Cè di più.wav', 'Èssere.flac', \"dell'Amore.flac\"]:
+    open(name, 'w').close()
+"
 
 # Run sanitizer
-FILESYSTEM=fat32 DRY_RUN=true ../exfat-sanitizer-v12.1.4.sh /tmp/test-accents
+FILESYSTEM=fat32 DRY_RUN=true ../exfat-sanitizer-v12.1.6.sh /tmp/test-accents
 
 # Check CSV — all should show LOGGED (not RENAMED)
-grep -E "Loïc|Révérence|Cè" sanitizer_fat32_*.csv
+grep -E "Loïc|Révérence|Cè|Èssere|Amore" sanitizer_fat32_*.csv
+```
+
+### Tip 6: Use Interactive Mode for First Runs
+
+```bash
+# First time? Preview interactively to learn what the script does
+INTERACTIVE=true \
+  DRY_RUN=true \
+  FILESYSTEM=exfat \
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
+# Walk through each rename, then switch to auto-mode for subsequent runs
 ```
 
 ---
@@ -631,16 +749,25 @@ No! It only renames files. Nothing is deleted, ever.
 The CSV file records all old→new names. You can manually rename back if needed.
 
 **Q: Do I need Python 3?**
-Yes. Python 3 (3.6+) is required for proper UTF-8 handling. macOS 12.3+ includes it by default.
+Yes. Python 3 (3.6+) is required for the Unicode-safe sanitization pipeline. macOS 12.3+ includes it by default.
 
 **Q: My files didn't change — is that bad?**
 No! That means your files are already compatible. Status: `LOGGED`. That's good!
 
 **Q: Will accents be stripped like in older versions?**
-No! v12.1.4 preserves all accents via FAT32 LFN (UTF-16) support. Only illegal characters (`<`, `>`, `:`, `*`, etc.) are replaced.
+No! v12.1.6 uses a Python-based sanitization pipeline that operates on Unicode code points natively. All accents (È, è, à, ì, ò, ù, ï, ê, ö, ü) are fully preserved. Only illegal characters (`<`, `>`, `:`, `*`, etc.) are replaced.
+
+**Q: What about apostrophes in filenames like `dell'Amore`?**
+Straight apostrophe `'` (U+0027) is a legal character on all supported filesystems. v12.1.6 correctly preserves it. Earlier versions incorrectly removed it.
+
+**Q: What is Interactive Mode?**
+When `INTERACTIVE=true`, the script pauses at each file or folder that needs renaming and lets you choose the new name. You can accept the auto-suggestion (press Enter) or type a custom name. Invalid names are rejected and you're re-prompted.
+
+**Q: Can I use Interactive Mode with DRY_RUN?**
+Yes! `INTERACTIVE=true DRY_RUN=true` lets you walk through every rename decision without making any changes. The chosen names are logged to the CSV report for review.
 
 **Q: How long does it take?**
-For ~4,000 files: 15–30 seconds (dry-run or apply).
+For ~4,000 files: 15–30 seconds (auto-mode). Interactive mode depends on how many files need renaming and how long you spend on each decision.
 
 **Q: Does it work on Windows?**
 Yes, with WSL (Windows Subsystem for Linux), Git Bash, or Cygwin.
@@ -655,8 +782,8 @@ Yes, with WSL (Windows Subsystem for Linux), Git Bash, or Cygwin.
 **Q: What does "Path too long" mean?**
 The full filename + directory path exceeds the filesystem limit. Shorten folder names or file names.
 
-**Q: What changed in v12.1.4?**
-Fixed inverted conditional logic in character classification, improved NFD→NFC normalization for macOS, and added `DEBUG_UNICODE` diagnostic mode.
+**Q: What changed from v12.1.4 to v12.1.6?**
+v12.1.6 fixes a critical bug where multibyte UTF-8 characters (È, è, à) were silently dropped on macOS, fixes apostrophe handling, and adds Interactive Mode. The entire sanitization pipeline was rewritten in Python for native Unicode safety.
 
 ---
 
@@ -676,7 +803,7 @@ sudo dnf install python3      # Fedora/RHEL
 
 ```bash
 # Make script executable
-chmod +x exfat-sanitizer-v12.1.4.sh
+chmod +x exfat-sanitizer-v12.1.6.sh
 
 # Check file/directory permissions
 ls -la /path/to/files
@@ -695,7 +822,7 @@ ls -la /path/to/files
 pwd
 
 # Use absolute path if needed
-./exfat-sanitizer-v12.1.4.sh ~/Music
+./exfat-sanitizer-v12.1.6.sh ~/Music
 ```
 
 ### Files not being renamed
@@ -705,22 +832,22 @@ pwd
 echo "DRY_RUN is $DRY_RUN"
 
 # To actually apply changes:
-DRY_RUN=false ./exfat-sanitizer-v12.1.4.sh /path/to/files
+DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh /path/to/files
 ```
 
 ### Accents are being stripped
 
 ```bash
 # Check your version
-head -3 exfat-sanitizer-v12.1.4.sh
-# Expected: SCRIPT_VERSION="12.1.4"
+head -3 exfat-sanitizer-v12.1.6.sh
+# Expected: SCRIPT_VERSION="12.1.6"
 
 # Enable debug mode
-DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.4.sh ~/Music 2>debug.log
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music 2>debug.log
 grep "MISMATCH" debug.log
 
-# If you see an older version, download v12.1.4:
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.4/exfat-sanitizer-v12.1.4.sh
+# If you see an older version, download v12.1.6:
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
 ```
 
 ### CSV shows nothing
@@ -733,21 +860,30 @@ ls /path/to/files | wc -l
 grep "LOGGED" sanitizer_*.csv | wc -l
 ```
 
+### Interactive mode prompt not appearing
+
+```bash
+# Interactive mode only prompts for files that NEED renaming
+# If all files are compliant, no prompts will appear
+
+# Verify with a dry run first to see how many files need renaming
+FILESYSTEM=exfat DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+grep "RENAMED" sanitizer_exfat_*.csv | wc -l
+# If 0, all files are already compliant — nothing to prompt for
+```
+
 ---
 
-## Why v12.1.4?
+## Why v12.1.6?
 
-| Version | Accent Preservation | Production Ready | Recommendation |
-|---------|--------------------|--------------------|----------------|
-| v9.0.2.2 | ❌ Broken | No | Avoid |
-| v11.0.5 | ✅ Fixed | Yes | Upgrade to v12.1.4 |
-| v11.1.0 | ✅ Fixed | Yes | Upgrade to v12.1.4 |
-| v12.0.0 | ⚠️ Partial | Partial | Skip |
-| v12.1.0 | ⚠️ Partial | Partial | Skip |
-| v12.1.1 | ❌ Critical Bug | No | **DO NOT USE** |
-| v12.1.2 | ✅ Fixed | Yes | Upgrade to v12.1.4 |
-| v12.1.3 | ⚠️ Inverted Logic | Partial | Skip |
-| **v12.1.4** | **✅ Fixed** | **Yes** | **← RECOMMENDED** |
+| Version | Accent Preservation | Apostrophe | Interactive | Production Ready | Recommendation |
+|---------|--------------------|-----------:|:-----------:|:----------------:|----------------|
+| v9.0.2.2 | ❌ Broken | — | — | No | Avoid |
+| v11.1.0 | ✅ Fixed | ✅ | — | Yes | Upgrade to v12.1.6 |
+| v12.1.2 | ✅ Fixed | ✅ | — | Yes | Upgrade to v12.1.6 |
+| v12.1.4 | ✅ Fixed | ✅ | — | Yes | Upgrade to v12.1.6 |
+| v12.1.5 | ⚠️ È dropped | ⚠️ Dropped | ✅ | No | Skip |
+| **v12.1.6** | **✅ Full** | **✅ Full** | **✅** | **Yes** | **← RECOMMENDED** |
 
 ---
 
@@ -846,7 +982,7 @@ FILESYSTEM=exfat \
   COPY_TO=/Volumes/2.5ex/Musica/ \
   IGNORE_FILE=./exfat-sanitizer-ignore.txt \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.4.sh ~/Music
+  ./exfat-sanitizer-v12.1.6.sh ~/Music
 
 # Step 2: Clean up ._ files (choose one)
 dot_clean -m /Volumes/2.5ex/Musica/          # Option A: merge/clean (recommended)
@@ -870,8 +1006,8 @@ find /Volumes/2.5ex/Musica/ -name '._*' | wc -l
 ### Documentation
 
 - [README.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/README.md) — Comprehensive documentation
-- [RELEASE-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.4.md) — Release notes
-- [CHANGELOG-v12.1.4.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.4.md) — Complete version history
+- [RELEASE-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.6.md) — Release notes
+- [CHANGELOG-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.6.md) — Complete version history
 
 ### Support
 
@@ -883,11 +1019,13 @@ find /Volumes/2.5ex/Musica/ -name '._*' | wc -l
 
 ## Success Checklist
 
-After running exfat-sanitizer v12.1.4, you should be able to:
+After running exfat-sanitizer v12.1.6, you should be able to:
 
 - ✅ Copy files to FAT32/exFAT USB drives without errors
 - ✅ Sync between Mac and Windows without issues
-- ✅ Preserve accented characters (Loïc, Révérence, Cè di più)
+- ✅ Preserve accented characters (Loïc, Révérence, Cè di più, Èssere)
+- ✅ Preserve apostrophes in filenames (dell'Amore, Cos'è)
+- ✅ Interactively review and approve each rename decision
 - ✅ Open files on different devices
 - ✅ See all files in directory listings
 - ✅ Safely backup files across systems
@@ -902,7 +1040,7 @@ After running exfat-sanitizer v12.1.4, you should be able to:
 
 ---
 
-**Last Updated:** February 17, 2026
-**Version:** 12.1.4
+**Last Updated:** March 6, 2026
+**Version:** 12.1.6
 **Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
 **Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)
