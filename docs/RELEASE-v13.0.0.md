@@ -1,14 +1,14 @@
-# Release Notes — exfat-sanitizer v12.1.6
+# Release Notes — exfat-sanitizer v13.0.0
 
 **Release Date:** March 6, 2026
-**Version:** 12.1.6
+**Version:** 13.0.0
 **Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
 
 ---
 
 ## Upgrade Urgency: CRITICAL
 
-v12.1.6 is a major release that introduces **Interactive Mode** for operator-driven renames and fixes a **critical UTF-8 bug** where multibyte characters (È, è, à, ì, ò, ù) were silently dropped during bash pipe processing on macOS. The entire character-level sanitization pipeline has been rewritten in Python for native Unicode safety.
+v13.0.0 is a major release that introduces **Interactive Mode** for operator-driven renames and fixes a **critical UTF-8 bug** where multibyte characters (È, è, à, ì, ò, ù) were silently dropped during bash pipe processing on macOS. The entire character-level sanitization pipeline has been rewritten in Python for native Unicode safety.
 
 **If you're using v12.1.5 or earlier**, upgrade immediately to prevent silent data loss on filenames containing accented characters.
 
@@ -31,13 +31,13 @@ v12.1.6 is a major release that introduces **Interactive Mode** for operator-dri
 
 ```bash
 # Download the latest version
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh
 
 # Make it executable
-chmod +x exfat-sanitizer-v12.1.6.sh
+chmod +x exfat-sanitizer-v13.0.0.sh
 
 # Test with dry-run (safe, no changes)
-./exfat-sanitizer-v12.1.6.sh ~/Music
+./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 ### Clone Repository
@@ -45,13 +45,13 @@ chmod +x exfat-sanitizer-v12.1.6.sh
 ```bash
 git clone https://github.com/fbaldassarri/exfat-sanitizer.git
 cd exfat-sanitizer
-chmod +x exfat-sanitizer-v12.1.6.sh
-./exfat-sanitizer-v12.1.6.sh ~/Music
+chmod +x exfat-sanitizer-v13.0.0.sh
+./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 ---
 
-## What's Fixed in v12.1.6
+## What's Fixed in v13.0.0
 
 ### Fix 1: Multibyte UTF-8 Characters Silently Dropped (CRITICAL)
 
@@ -64,18 +64,18 @@ Real-world example from an Italian music library:
 ```
 Original:  "Èssere o non Èssere.flac"
 v12.1.5:   "  ssere o non   ssere.flac"   ← È silently dropped!
-v12.1.6:   "Èssere o non Èssere.flac"     ← È correctly preserved ✅
+v13.0.0:   "Èssere o non Èssere.flac"     ← È correctly preserved ✅
 ```
 
 Affected characters included all multibyte UTF-8 sequences: È, è, à, ì, ò, ù, ï, ê, ö, ü, and others.
 
-**The Fix (v12.1.6):**
+**The Fix (v13.0.0):**
 
 The entire character-level sanitization logic has been moved from bash into an embedded Python script inside `sanitize_filename()`. Python operates on Unicode code points natively, eliminating the byte-splitting issue entirely. All checks — control characters, shell safety, zero-width exploits, illegal filesystem characters — now execute in a single Python pass.
 
 The old bash-based loop is retained only as a fallback if Python 3 is unavailable.
 
-**File:** `exfat-sanitizer-v12.1.6.sh`
+**File:** `exfat-sanitizer-v13.0.0.sh`
 **Function:** `sanitize_filename()`
 **Change:** Complete rewrite of character-level processing from bash to Python
 
@@ -85,7 +85,7 @@ The old bash-based loop is retained only as a fallback if Python 3 is unavailabl
 
 The straight apostrophe `'` (U+0027) is a legal character on exFAT, FAT32, NTFS, APFS, and HFS+ filesystems. However, the bash-based sanitization pipeline was dropping it during processing, causing filenames like `dell'Amore` to become `dellAmore` and `Cos'è` to become `Cos`.
 
-**The Fix (v12.1.6):**
+**The Fix (v13.0.0):**
 
 The Python-based sanitization pipeline only removes characters that are explicitly listed in the filesystem's illegal character set. Since `'` (U+0027) is not illegal on any supported filesystem, it is now correctly preserved.
 
@@ -93,12 +93,12 @@ The Python-based sanitization pipeline only removes characters that are explicit
 
 ## New Feature: Interactive Mode
 
-v12.1.6 introduces **Interactive Mode** (`INTERACTIVE=true`), giving operators full control over every rename decision. When enabled, each file or directory that needs renaming triggers an interactive prompt showing the current name and a suggested replacement.
+v13.0.0 introduces **Interactive Mode** (`INTERACTIVE=true`), giving operators full control over every rename decision. When enabled, each file or directory that needs renaming triggers an interactive prompt showing the current name and a suggested replacement.
 
 ### How It Works
 
 ```bash
-INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 For each item needing a rename, you'll see:
@@ -126,7 +126,7 @@ For each item needing a rename, you'll see:
 Both modes work together for safe testing:
 
 ```bash
-INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v12.1.6.sh ~/Music
+INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 When both are enabled, the operator is prompted for each rename and the chosen name is logged to the CSV report, but **no filesystem changes are applied**. This is ideal for previewing the interactive workflow before committing changes.
@@ -139,7 +139,7 @@ Interactive input reads from `/dev/tty` instead of stdin to avoid conflicts with
 
 ## Architecture Change: Python-Based Sanitization Pipeline
 
-The most significant internal change in v12.1.6 is the migration of the character-level sanitization loop from bash to Python. This addresses the fundamental architectural tension between bash's byte-oriented processing and Unicode's character-oriented model.
+The most significant internal change in v13.0.0 is the migration of the character-level sanitization loop from bash to Python. This addresses the fundamental architectural tension between bash's byte-oriented processing and Unicode's character-oriented model.
 
 ### Before (v12.1.5)
 
@@ -149,7 +149,7 @@ filename → extract_utf8_chars (Python) → bash pipe → while IFS= read -r ch
                                     Multibyte bytes split here on macOS
 ```
 
-### After (v12.1.6)
+### After (v13.0.0)
 
 ```
 filename → Python (single pass: all checks in one script) → result
@@ -206,8 +206,8 @@ for name in ['Èssere.flac', 'Perchè no.mp3', 'Ce la farò.wav', 'Loïc Nottet.
     open(name, 'w').close()
 "
 
-# Run v12.1.6
-FILESYSTEM=exfat DRY_RUN=true ../exfat-sanitizer-v12.1.6.sh .
+# Run v13.0.0
+FILESYSTEM=exfat DRY_RUN=true ../exfat-sanitizer-v13.0.0.sh .
 
 # Check results
 cat sanitizer_exfat_*.csv | grep -E "Èssere|Perchè|farò|Loïc|Amore"
@@ -222,7 +222,7 @@ mkdir -p /tmp/test-interactive && cd /tmp/test-interactive
 python3 -c "open('My Song: Remix?.flac', 'w').close()"
 
 # Run with interactive mode (DRY_RUN for safety)
-INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ../exfat-sanitizer-v12.1.6.sh .
+INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ../exfat-sanitizer-v13.0.0.sh .
 
 # Expected: Prompt appears showing original and suggested name
 # Press Enter to accept, or type a custom name
@@ -231,8 +231,8 @@ INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ../exfat-sanitizer-v12.1.6.sh .
 ### Verify Version
 
 ```bash
-head -5 exfat-sanitizer-v12.1.6.sh
-# Expected: SCRIPT_VERSION="12.1.6"
+head -5 exfat-sanitizer-v13.0.0.sh
+# Expected: SCRIPT_VERSION="13.0.0"
 ```
 
 ---
@@ -241,7 +241,7 @@ head -5 exfat-sanitizer-v12.1.6.sh
 
 ### Feature Matrix (v12.x Series)
 
-| Feature | v12.1.2 | v12.1.3 | v12.1.4 | v12.1.5 | v12.1.6 |
+| Feature | v12.1.2 | v12.1.3 | v12.1.4 | v12.1.5 | v13.0.0 |
 |---------|---------|---------|---------|---------|---------|
 | Accent Preservation | Mostly | Mostly | Mostly | Mostly | **Full** |
 | Apostrophe Handling | Fixed | Fixed | Fixed | Fixed | **Fixed** |
@@ -258,31 +258,31 @@ head -5 exfat-sanitizer-v12.1.6.sh
 
 | From | To | Priority | Notes |
 |------|----|----------|-------|
-| v12.1.5 | v12.1.6 | **Critical** | Fixes silent multibyte character loss |
-| v12.1.4 | v12.1.6 | **Critical** | Fixes UTF-8 pipeline + adds interactive mode |
-| v12.1.3 or earlier | v12.1.6 | **Critical** | Multiple critical fixes + new features |
-| v11.x | v12.1.6 | **Critical** | Major upgrade with full Unicode support |
+| v12.1.5 | v13.0.0 | **Critical** | Fixes silent multibyte character loss |
+| v12.1.4 | v13.0.0 | **Critical** | Fixes UTF-8 pipeline + adds interactive mode |
+| v12.1.3 or earlier | v13.0.0 | **Critical** | Multiple critical fixes + new features |
+| v11.x | v13.0.0 | **Critical** | Major upgrade with full Unicode support |
 
 ---
 
 ## Migration Guide
 
-### From v12.1.4 or v12.1.5 to v12.1.6
+### From v12.1.4 or v12.1.5 to v13.0.0
 
 **Action Required:** Critical upgrade
 
 ```bash
 # Replace script file
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
-chmod +x exfat-sanitizer-v12.1.6.sh
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh
+chmod +x exfat-sanitizer-v13.0.0.sh
 
 # Test (same commands work)
-DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 **Backward Compatibility:** Fully compatible — no breaking changes. All existing environment variables and options work identically. The new `INTERACTIVE` variable defaults to `false`, preserving existing behavior.
 
-### From v12.1.3 or Earlier to v12.1.6
+### From v12.1.3 or Earlier to v13.0.0
 
 **Action Required:** Critical upgrade
 
@@ -292,23 +292,23 @@ DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
    # Should be 3.6 or higher
    ```
 
-2. **Download v12.1.6:**
+2. **Download v13.0.0:**
    ```bash
-   curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
-   chmod +x exfat-sanitizer-v12.1.6.sh
+   curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh
+   chmod +x exfat-sanitizer-v13.0.0.sh
    ```
 
 3. **Test with dry run:**
    ```bash
-   DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+   DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music
    ```
 
 4. **If your files were already sanitized by earlier versions:**
    - Files with accented characters (È, è, à, etc.) that were previously incorrectly renamed can be re-imported from original backups
-   - v12.1.6 prevents future accent loss but cannot restore already-removed accents
+   - v13.0.0 prevents future accent loss but cannot restore already-removed accents
    - Use `INTERACTIVE=true` for fine-grained control over future renames
 
-### From v11.x to v12.1.6
+### From v11.x to v13.0.0
 
 **Action Required:** Critical upgrade
 
@@ -316,12 +316,12 @@ DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
 # Backup old script
 mv exfat-sanitizer-v11.*.sh exfat-sanitizer-v11.sh.backup
 
-# Download v12.1.6
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
-chmod +x exfat-sanitizer-v12.1.6.sh
+# Download v13.0.0
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh
+chmod +x exfat-sanitizer-v13.0.0.sh
 
 # Test (same commands work)
-./exfat-sanitizer-v12.1.6.sh ~/Music
+./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 **What's new since v11.x:** FAT32 Unicode preservation via LFN support, Python-based sanitization pipeline, interactive mode, tree generation, enhanced copy modes, NFD/NFC normalization, and debug mode.
@@ -338,7 +338,7 @@ chmod +x exfat-sanitizer-v12.1.6.sh
 | `SANITIZATION_MODE` | `conservative` | `strict`, `conservative`, `permissive` | Sanitization level |
 | `DRY_RUN` | `true` | `true`, `false` | Preview or apply changes |
 | `REPLACEMENT_CHAR` | `_` | Any single character | Replacement for illegal characters |
-| `INTERACTIVE` | `false` | `true`, `false` | Prompt operator for each rename **(New in v12.1.6)** |
+| `INTERACTIVE` | `false` | `true`, `false` | Prompt operator for each rename **(New in v13.0.0)** |
 
 ### Unicode Handling
 
@@ -394,12 +394,12 @@ chmod +x exfat-sanitizer-v12.1.6.sh
 
 ### Main Script
 
-- [`exfat-sanitizer-v12.1.6.sh`](https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh)
+- [`exfat-sanitizer-v13.0.0.sh`](https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh)
 
 ### Source Code
 
-- [Source code (zip)](https://github.com/fbaldassarri/exfat-sanitizer/archive/refs/tags/v12.1.6.zip)
-- [Source code (tar.gz)](https://github.com/fbaldassarri/exfat-sanitizer/archive/refs/tags/v12.1.6.tar.gz)
+- [Source code (zip)](https://github.com/fbaldassarri/exfat-sanitizer/archive/refs/tags/v13.0.0.zip)
+- [Source code (tar.gz)](https://github.com/fbaldassarri/exfat-sanitizer/archive/refs/tags/v13.0.0.tar.gz)
 
 ---
 
@@ -407,12 +407,12 @@ chmod +x exfat-sanitizer-v12.1.6.sh
 
 Included in this release:
 
-- **exfat-sanitizer-v12.1.6.sh** — Main script
+- **exfat-sanitizer-v13.0.0.sh** — Main script
 - **README.md** — Complete project documentation
 - **QUICK_START_GUIDE.md** — Getting started guide with common scenarios
 - **DOCUMENTATION.md** — Deep technical dive for developers and contributors
-- **RELEASE-v12.1.6.md** — This file
-- **CHANGELOG-v12.1.6.md** — Complete version history
+- **RELEASE-v13.0.0.md** — This file
+- **CHANGELOG-v13.0.0.md** — Complete version history
 - **PROJECT_ANALYSIS.md** — Comprehensive project analysis
 - **DEVELOPMENT_CONTEXT.md** — Development continuity guide with bug fix history and architecture notes
 - **test.sh** — Test suite (20 tests)
@@ -428,34 +428,34 @@ Included in this release:
 ### Verify Fix
 
 ```bash
-# Download v12.1.6
-curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v12.1.6/exfat-sanitizer-v12.1.6.sh
-chmod +x exfat-sanitizer-v12.1.6.sh
+# Download v13.0.0
+curl -LO https://github.com/fbaldassarri/exfat-sanitizer/releases/download/v13.0.0/exfat-sanitizer-v13.0.0.sh
+chmod +x exfat-sanitizer-v13.0.0.sh
 
 # Test on your music library
-./exfat-sanitizer-v12.1.6.sh ~/Music
+./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 ### Common Workflows
 
 ```bash
 # Sanitize exFAT music library (accents fully preserved)
-FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Interactive mode — choose each rename manually
-INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Preview interactive mode (no changes applied)
-INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v12.1.6.sh ~/Music
+INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Copy to USB drive with versioning
-FILESYSTEM=exfat COPY_TO=/Volumes/USB/ COPY_BEHAVIOR=version DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+FILESYSTEM=exfat COPY_TO=/Volumes/USB/ COPY_BEHAVIOR=version DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Generate tree snapshot
-GENERATE_TREE=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+GENERATE_TREE=true ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Debug Unicode normalization
-DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music 2>debug.log
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music 2>debug.log
 ```
 
 ---
@@ -498,4 +498,4 @@ Copyright (c) 2026 fbaldassarri
 
 *Made with care for the open-source community*
 
-**Version:** 12.1.6 | **Release Date:** March 6, 2026 | **Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)
+**Version:** 13.0.0 | **Release Date:** March 6, 2026 | **Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)

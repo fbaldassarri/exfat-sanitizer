@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# exfat-sanitizer v12.1.6 
+# exfat-sanitizer v13.0.0 
 
 set -o pipefail
 
-SCRIPT_VERSION="12.1.6"
+SCRIPT_VERSION="13.0.0"
 SCRIPT_NAME="exfat-sanitizer"
 
 # ============================================================================
@@ -26,8 +26,6 @@ CHECK_UNICODE_EXPLOITS="${CHECK_UNICODE_EXPLOITS:=false}"
 
 # Unicode handling
 NORMALIZE_APOSTROPHES="${NORMALIZE_APOSTROPHES:=true}"
-PRESERVE_UNICODE="${PRESERVE_UNICODE:=true}"
-EXTENDED_CHARSET="${EXTENDED_CHARSET:=true}"
 
 # Debug mode (added in v12.1.3)
 DEBUG_UNICODE="${DEBUG_UNICODE:=false}"
@@ -35,6 +33,55 @@ DEBUG_UNICODE="${DEBUG_UNICODE:=false}"
 # Interactive mode (added in v12.1.5)
 # When true, prompts operator for each rename decision
 INTERACTIVE="${INTERACTIVE:=false}"
+
+# ============================================================================
+# CONFIGURATION VALIDATION
+# ============================================================================
+
+validate_config() {
+	local valid=true
+
+	case "$FILESYSTEM" in
+		fat32|exfat|ntfs|apfs|hfsplus|universal) ;;
+		*)
+			echo "❌ ERROR: Invalid FILESYSTEM='$FILESYSTEM'" >&2
+			echo "   Valid options: fat32, exfat, ntfs, apfs, hfsplus, universal" >&2
+			valid=false
+			;;
+	esac
+
+	case "$SANITIZATION_MODE" in
+		strict|conservative|permissive) ;;
+		*)
+			echo "❌ ERROR: Invalid SANITIZATION_MODE='$SANITIZATION_MODE'" >&2
+			echo "   Valid options: strict, conservative, permissive" >&2
+			valid=false
+			;;
+	esac
+
+	case "$COPY_BEHAVIOR" in
+		skip|overwrite|version) ;;
+		*)
+			echo "❌ ERROR: Invalid COPY_BEHAVIOR='$COPY_BEHAVIOR'" >&2
+			echo "   Valid options: skip, overwrite, version" >&2
+			valid=false
+			;;
+	esac
+
+	case "$DRY_RUN" in
+		true|false) ;;
+		*)
+			echo "❌ ERROR: Invalid DRY_RUN='$DRY_RUN'" >&2
+			echo "   Valid options: true, false" >&2
+			valid=false
+			;;
+	esac
+
+	if [ "$valid" = false ]; then
+		return 1
+	fi
+	return 0
+}
 
 # ============================================================================
 # DEPENDENCY VALIDATION
@@ -95,16 +142,16 @@ normalize_unicode() {
 	if command -v python3 >/dev/null 2>&1; then
 		result=$(python3 -c "import sys, unicodedata; print(unicodedata.normalize('NFC', sys.stdin.read().strip()))" <<< "$text" 2>/dev/null)
 		if [ $? -eq 0 ] && [ -n "$result" ]; then
-			echo "$result"
+			printf '%s\n' "$result"
 			return 0
 		fi
 	fi
 
 	# Method 2: uconv (ICU tools)
 	if command -v uconv >/dev/null 2>&1; then
-		result=$(echo "$text" | uconv -f UTF-8 -t UTF-8 -x NFC 2>/dev/null)
+		result=$(printf '%s' "$text" | uconv -f UTF-8 -t UTF-8 -x NFC 2>/dev/null)
 		if [ $? -eq 0 ] && [ -n "$result" ]; then
-			echo "$result"
+			printf '%s\n' "$result"
 			return 0
 		fi
 	fi
@@ -113,22 +160,22 @@ normalize_unicode() {
 	if command -v perl >/dev/null 2>&1; then
 		result=$(perl -CS -MUnicode::Normalize -ne 'print NFC($_)' <<< "$text" 2>/dev/null)
 		if [ $? -eq 0 ] && [ -n "$result" ]; then
-			echo "$result"
+			printf '%s\n' "$result"
 			return 0
 		fi
 	fi
 
 	# Method 4: iconv (last resort - doesn't normalize but preserves UTF-8)
 	if command -v iconv >/dev/null 2>&1; then
-		result=$(echo "$text" | iconv -f UTF-8 -t UTF-8 2>/dev/null)
+		result=$(printf '%s' "$text" | iconv -f UTF-8 -t UTF-8 2>/dev/null)
 		if [ $? -eq 0 ] && [ -n "$result" ]; then
-			echo "$result"
+			printf '%s\n' "$result"
 			return 0
 		fi
 	fi
 
 	# Fallback: return original (no normalization)
-	echo "$text"
+	printf '%s\n' "$text"
 }
 
 # ============================================================================
@@ -154,19 +201,14 @@ should_skip_system_file() {
 get_illegal_chars() {
 	local fs="$1"
 	case "$fs" in
-		fat32|exfat|universal)
+		fat32|exfat|ntfs|universal)
 			echo '"*/:<>?\|'
 			;;
-		ntfs)
-			echo '"*/:<>?\|'
-			;;
-		apfs)
-			echo ':/'
-			;;
-		hfsplus)
+		apfs|hfsplus)
 			echo ':/'
 			;;
 		*)
+			echo "⚠️  WARNING: Unknown filesystem '$fs', using FAT32 rules" >&2
 			echo '"*/:<>?\|'
 			;;
 	esac
@@ -203,7 +245,8 @@ handle_file_conflict() {
 			return 0
 			;;
 		version)
-			return 0
+			# Return 1 so copy_file() enters the versioning logic
+			return 1
 			;;
 		*)
 			return 1
@@ -223,16 +266,24 @@ copy_file() {
 			local base="${dest_file%.*}"
 			local ext="${dest_file##*.}"
 			local version=1
-			while [ -e "$base-v$version.$ext" ]; do
-				((version++))
-			done
-			dest_file="$base-v$version.$ext"
+			# Handle extensionless files (base == ext when no '.' present)
+			if [ "$base" = "$ext" ]; then
+				while [ -e "${dest_file}-v$version" ]; do
+					((version++))
+				done
+				dest_file="${dest_file}-v$version"
+			else
+				while [ -e "$base-v$version.$ext" ]; do
+					((version++))
+				done
+				dest_file="$base-v$version.$ext"
+			fi
 		else
 			return 1
 		fi
 	fi
 
-	if cp "$source" "$dest_file" 2>/dev/null; then
+	if cp -- "$source" "$dest_file" 2>/dev/null; then
 		return 0
 	else
 		return 1
@@ -332,7 +383,7 @@ except UnicodeEncodeError:
 
 	# Method 3: Fallback (will break UTF-8)
 	echo "⚠️  WARNING: Using grep fallback - UTF-8 may be corrupted!" >&2
-	echo "$text" | grep -o .
+	printf '%s' "$text" | grep -o .
 }
 
 # ============================================================================
@@ -343,7 +394,7 @@ normalize_apostrophes() {
 	local text="$1"
 
 	if [ "$NORMALIZE_APOSTROPHES" != "true" ]; then
-		echo "$text"
+		printf '%s\n' "$text"
 		return
 	fi
 
@@ -353,13 +404,14 @@ normalize_apostrophes() {
 import sys
 text = sys.stdin.read().strip()
 
-# Map curly apostrophes/quotes to straight apostrophe
-# Using explicit Unicode code points to avoid any ambiguity
+# Map curly apostrophes/quotes to straight apostrophe (chr(39) = U+0027)
+# Using chr(39) avoids bash double-quote escaping issues
+straight = chr(39)
 replacements = {
-	'\u2018': "'",  # LEFT SINGLE QUOTATION MARK
-	'\u2019': "'",  # RIGHT SINGLE QUOTATION MARK
-	'\u201A': "'",  # SINGLE LOW-9 QUOTATION MARK
-	'\u02BC': "'",  # MODIFIER LETTER APOSTROPHE
+	'\u2018': straight,  # LEFT SINGLE QUOTATION MARK
+	'\u2019': straight,  # RIGHT SINGLE QUOTATION MARK
+	'\u201A': straight,  # SINGLE LOW-9 QUOTATION MARK
+	'\u02BC': straight,  # MODIFIER LETTER APOSTROPHE
 }
 
 for old, new in replacements.items():
@@ -371,7 +423,7 @@ print(text)
 
 	# Fallback: If Python unavailable, skip normalization to avoid corruption
 	# Better to keep curly apostrophes than corrupt Unicode characters
-	echo "$text"
+	printf '%s\n' "$text"
 }
 
 # ============================================================================
@@ -416,7 +468,7 @@ validate_filename() {
 	done < <(extract_utf8_chars "$name")
 
 	if [ -n "$found_illegal" ]; then
-		echo "$found_illegal"
+		printf '%s\n' "$found_illegal"
 		return 1
 	fi
 	return 0
@@ -462,8 +514,8 @@ interactive_prompt() {
 			continue
 		fi
 
-		# Check for reserved names on FAT32/universal
-		if [ "$filesystem" = "fat32" ] || [ "$filesystem" = "universal" ]; then
+		# Check for reserved names on FAT32/exFAT/NTFS/universal
+		if [ "$filesystem" = "fat32" ] || [ "$filesystem" = "exfat" ] || [ "$filesystem" = "ntfs" ] || [ "$filesystem" = "universal" ]; then
 			local basename_only="${chosen%.*}"
 			if is_reserved_name "$basename_only"; then
 				echo "  ⚠️  '$basename_only' is a Windows reserved name (CON, PRN, AUX, etc.)" >/dev/tty
@@ -483,11 +535,11 @@ interactive_prompt() {
 		break
 	done
 
-	echo "$chosen"
+	printf '%s\n' "$chosen"
 }
 
 # ============================================================================
-# MAIN SANITIZATION FUNCTION - REWRITTEN in v12.1.6 (Python pipeline)
+# MAIN SANITIZATION FUNCTION - REWRITTEN in v13.0.0 (Python pipeline)
 # ============================================================================
 
 sanitize_filename() {
@@ -619,11 +671,11 @@ print(sanitized)
 		fi
 	fi
 
-	echo "$sanitized"
+	printf '%s\n' "$sanitized"
 }
 
 # ============================================================================
-# MAIN PROCESSING - Updated in v12.1.6 (interactive mode + Python pipeline)
+# MAIN PROCESSING - Updated in v13.0.0 (interactive mode + Python pipeline)
 # ============================================================================
 
 process_directory() {
@@ -631,12 +683,6 @@ process_directory() {
 	local output_file="sanitizer_${FILESYSTEM}_$(date +%Y%m%d_%H%M%S).csv"
 
 	echo "Type|Old Name|New Name|Issues|Path|Path Length|Status|Copy Status|Ignore Pattern" > "$output_file"
-
-	local _total_scanned=0
-	local _total_renamed=0
-	local _total_ignored=0
-	local _total_copied=0
-	local _total_skipped=0
 
 	_process_items_recursive() {
 		local current_path="$1"
@@ -655,11 +701,8 @@ process_directory() {
 				type="Directory"
 			fi
 
-			((_total_scanned++))
-
 			if should_ignore "$relative_path" "$IGNORE_FILE"; then
 				echo "$type|$name|$name|-|$relative_path|${#relative_path}|IGNORED|NA|match" >> "$output_file"
-				((_total_ignored++))
 
 				if [ "$type" = "Directory" ]; then
 					_process_items_recursive "$item"
@@ -689,45 +732,55 @@ process_directory() {
 			fi
 
 			local copy_status="NA"
+			local rename_status=""
+			local final_name=""
 
 			# Compare normalized strings
 			if [ "$sanitized_normalized" != "$name_normalized" ]; then
-				local final_name="$sanitized"
+				final_name="$sanitized"
 
 				# Interactive mode: prompt operator for the new name
 				if [ "$INTERACTIVE" = "true" ]; then
 					final_name=$(interactive_prompt "$name" "$sanitized" "$type" "$FILESYSTEM")
 				fi
 
-				echo "$type|$name|$final_name|-|$relative_path|${#relative_path}|RENAMED|$copy_status|-" >> "$output_file"
-				((_total_renamed++))
+				rename_status="RENAMED"
 
 				if [ "$DRY_RUN" != "true" ]; then
 					local new_path="$(dirname "$item")/$final_name"
 					if [ -e "$new_path" ] && [ "$new_path" != "$item" ]; then
 						echo "$type|$name|$final_name|COLLISION|$relative_path|${#relative_path}|FAILED|NA|-" >> "$output_file"
+						rename_status=""
 					else
-						mv "$item" "$new_path" 2>/dev/null || true
-						item="$new_path"
+						if mv -- "$item" "$new_path" 2>/dev/null; then
+							item="$new_path"
+						else
+							echo "$type|$name|$final_name|MV_FAILED|$relative_path|${#relative_path}|FAILED|NA|-" >> "$output_file"
+							rename_status=""
+						fi
 					fi
 				fi
-			else
-				echo "$type|$name|$name|-|$relative_path|${#relative_path}|LOGGED|$copy_status|-" >> "$output_file"
 			fi
 
+			# Perform copy if configured (before writing CSV so copy_status is accurate)
 			if [ -n "$COPY_TO" ] && [ "$type" = "File" ]; then
 				local dest_dir="$COPY_TO/$(dirname "$relative_path")"
 				mkdir -p "$dest_dir" 2>/dev/null
 
 				if [ "$DRY_RUN" != "true" ]; then
-					if copy_file "$item" "$dest_dir" "${final_name:-$sanitized}" "$COPY_BEHAVIOR"; then
+					if copy_file "$item" "$dest_dir" "${final_name:-$name}" "$COPY_BEHAVIOR"; then
 						copy_status="COPIED"
-						((_total_copied++))
 					else
 						copy_status="SKIPPED"
-						((_total_skipped++))
 					fi
 				fi
+			fi
+
+			# Write CSV entry with accurate copy_status
+			if [ "$rename_status" = "RENAMED" ]; then
+				echo "$type|$name|$final_name|-|$relative_path|${#relative_path}|RENAMED|$copy_status|-" >> "$output_file"
+			elif [ -z "$rename_status" ] && [ "$sanitized_normalized" = "$name_normalized" ]; then
+				echo "$type|$name|$name|-|$relative_path|${#relative_path}|LOGGED|$copy_status|-" >> "$output_file"
 			fi
 
 			if [ "$type" = "Directory" ]; then
@@ -748,7 +801,7 @@ main() {
 	if [ $# -eq 0 ]; then
 		echo "Usage: $SCRIPT_NAME [OPTIONS] <directory>"
 		echo ""
-		echo "v12.1.6 — Python-Based Sanitization + Interactive Mode"
+		echo "v13.0.0 — Python-Based Sanitization + Interactive Mode"
 		echo ""
 		echo "   ✅ Full Python sanitization pipeline — native Unicode safety"
 		echo "   ✅ All accented characters preserved (à è é ì ò ù ï ê â ä ö ü È)"
@@ -772,9 +825,7 @@ main() {
 		echo "  CHECK_UNICODE_EXPLOITS=true|false (default: false)"
 		echo ""
 		echo "Unicode Handling:"
-		echo "  PRESERVE_UNICODE=true|false (default: true)"
 		echo "  NORMALIZE_APOSTROPHES=true|false (default: true)"
-		echo "  EXTENDED_CHARSET=true|false (default: true)"
 		echo "  DEBUG_UNICODE=true|false (default: false) - Added in v12.1.3"
 		echo ""
 		echo "Interactive Mode:"
@@ -794,15 +845,20 @@ main() {
 		return 1
 	fi
 
+	if ! validate_config; then
+		return 1
+	fi
+
+	# Trap handler for cleanup on interrupt
+	trap 'echo ""; echo "⚠️  Interrupted! Check CSV log for partial results." >&2; exit 130' INT TERM
+
 	echo "========== EXFAT-SANITIZER v$SCRIPT_VERSION =========="
-	echo "✅ v12.1.6: Python-based sanitization — full Unicode safety + interactive mode"
+	echo "✅ v13.0.0: Python-based sanitization — full Unicode safety + interactive mode"
 	echo "Scanning: $target_dir"
 	echo "Filesystem: $FILESYSTEM"
 	echo "Sanitization Mode: $SANITIZATION_MODE"
 	echo "Dry Run: $DRY_RUN"
-	echo "Preserve Unicode: $PRESERVE_UNICODE"
 	echo "Normalize Apostrophes: $NORMALIZE_APOSTROPHES"
-	echo "Extended Charset: $EXTENDED_CHARSET"
 	echo "Interactive Mode: $INTERACTIVE"
 	if [ "$INTERACTIVE" = "true" ]; then
 		echo "  → You will be prompted for each rename decision"
@@ -829,14 +885,14 @@ main() {
 	echo "CSV Log: $csv_file"
 	echo ""
 	echo "========== SUMMARY =========="
-	echo "Scanned Directories: $(grep -c "^Directory|" "$csv_file" 2>/dev/null || echo "0")"
-	echo "Scanned Files: $(grep -c "^File|" "$csv_file" 2>/dev/null || echo "0")"
-	echo "Ignored Items: $(grep -c "|IGNORED|" "$csv_file" 2>/dev/null || echo "0")"
-	echo "Items to Rename: $(grep -c "|RENAMED|" "$csv_file" 2>/dev/null || echo "0")"
+	echo "Scanned Directories: $(grep -c "^Directory|" "$csv_file" 2>/dev/null || true)"
+	echo "Scanned Files: $(grep -c "^File|" "$csv_file" 2>/dev/null || true)"
+	echo "Ignored Items: $(grep -c "|IGNORED|" "$csv_file" 2>/dev/null || true)"
+	echo "Items to Rename: $(grep -c "|RENAMED|" "$csv_file" 2>/dev/null || true)"
 
 	if [ -n "$COPY_TO" ]; then
-		echo "Files Copied: $(grep -c "|COPIED|" "$csv_file" 2>/dev/null || echo "0")"
-		echo "Files Skipped: $(grep -c "|SKIPPED|" "$csv_file" 2>/dev/null || echo "0")"
+		echo "Files Copied: $(grep -c "|COPIED|" "$csv_file" 2>/dev/null || true)"
+		echo "Files Skipped: $(grep -c "|SKIPPED|" "$csv_file" 2>/dev/null || true)"
 	fi
 
 	echo ""
@@ -849,7 +905,7 @@ main() {
 	fi
 
 	echo ""
-	echo "v12.1.6: Python sanitization pipeline — all accents and apostrophes preserved ✅"
+	echo "v13.0.0: Python sanitization pipeline — all accents and apostrophes preserved ✅"
 	echo "Expected: RENAMED only for files with filesystem-illegal characters"
 	echo "Expected: LOGGED (not RENAMED) for all accented characters (È, è, à, ì, ò, ù, ï, ê)"
 }

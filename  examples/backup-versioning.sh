@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Backup with Versioning using exfat-sanitizer v12.1.6
+# Backup with Versioning using exfat-sanitizer v13.0.0
 
 # Configuration
 FILESYSTEM=exfat
@@ -25,7 +25,7 @@ echo "Backing up with automatic versioning..."
 echo "Source: $SOURCE_DIR"
 echo "Destination: $COPY_TO"
 echo ""
-echo "v12.1.6 improvements:"
+echo "v13.0.0 improvements:"
 echo "  ✅ Accents preserved (Loïc, Révérence, Café)"
 echo "  ✅ Curly apostrophes normalized safely"
 echo "  ✅ No UTF-8 corruption"
@@ -43,7 +43,7 @@ FILESYSTEM=$FILESYSTEM \
   COPY_TO=$COPY_TO \
   COPY_BEHAVIOR=$COPY_BEHAVIOR \
   DRY_RUN=$DRY_RUN \
-  ./exfat-sanitizer-v12.1.6.sh "$SOURCE_DIR"
+  ./exfat-sanitizer-v13.0.0.sh "$SOURCE_DIR"
 
 echo ""
 echo "Backup complete with versioning"

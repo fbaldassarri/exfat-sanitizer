@@ -3,7 +3,7 @@
 | Field | Value |
 |-------|-------|
 | **Analyzed** | March 7, 2026 |
-| **Current Version** | 12.1.6 |
+| **Current Version** | 13.0.0 |
 | **Status** | Production-Ready — Feature & Bug Fix Release |
 | **Repository** | [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer) |
 
@@ -13,13 +13,13 @@
 
 exfat-sanitizer is a mature, production-ready cross-platform bash script that sanitizes filenames and directory names for compatibility across multiple filesystems while preserving Unicode/accented characters.
 
-Version 12.1.6 represents the latest release, incorporating five significant improvements across the v12.1.x series:
+Version 13.0.0 represents the latest release, incorporating five significant improvements across the v12.1.x series:
 
 1. **v12.1.2** — Python 3-based Unicode-aware apostrophe normalization (preventing UTF-8 corruption)
 2. **v12.1.3** — NFD→NFC normalization comparison (preventing false `RENAMED` status on macOS)
 3. **v12.1.4** — Inverted `if/else` conditional logic fix in `sanitize_filename()` (correct character classification)
 4. **v12.1.5** — Interactive mode with operator-controlled renaming and filename validation; full Python-based character-level sanitization replacing the bash pipe approach
-5. **v12.1.6** — Current stable release consolidating all fixes and features
+5. **v13.0.0** — Current stable release consolidating all fixes and features
 
 The project has evolved from a basic sanitization tool (v9.x) to a comprehensive Unicode-preserving solution (v12.x) with robust testing (20 tests), comprehensive documentation (120KB+ across 6 documents), interactive operator controls, and real-world production validation on 4,000+ file libraries.
 
@@ -98,7 +98,7 @@ The project has evolved from a basic sanitization tool (v9.x) to a comprehensive
 - Bash fallback retained with explicit warning for environments without Python 3
 - **Result:** Robust, Unicode-safe sanitization with operator control
 
-### Phase 10: Stable Release (v12.1.6 — March 2026) ← CURRENT
+### Phase 10: Stable Release (v13.0.0 — March 2026) ← CURRENT
 
 - Consolidation of all v12.1.x fixes and features
 - Production-validated with full test coverage (20 tests)
@@ -111,7 +111,7 @@ The project has evolved from a basic sanitization tool (v9.x) to a comprehensive
 
 ### Core Components
 
-#### 1. Main Script: `exfat-sanitizer-v12.1.6.sh`
+#### 1. Main Script: `exfat-sanitizer-v13.0.0.sh`
 
 - **Language:** Bash 4.0+ with Python 3.6+ (mandatory)
 - **Size:** ~25KB (expanded from v12.1.4's ~22KB due to interactive mode)
@@ -149,8 +149,8 @@ The project has evolved from a basic sanitization tool (v9.x) to a comprehensive
 | `README.md` | ~18KB | Overview, installation, features, configuration |
 | `QUICK_START_GUIDE.md` | ~25KB | Step-by-step guide, common scenarios, AppleDouble cleanup |
 | `DOCUMENTATION.md` | ~47KB | Deep technical dive (23 sections) |
-| `RELEASE-v12.1.6.md` | ~16KB | Version-specific changes, interactive mode, and critical fixes |
-| `CHANGELOG-v12.1.6.md` | ~15KB | Complete version history |
+| `RELEASE-v13.0.0.md` | ~16KB | Version-specific changes, interactive mode, and critical fixes |
+| `CHANGELOG-v13.0.0.md` | ~15KB | Complete version history |
 | `PROJECT_ANALYSIS.md` | (this file) | Comprehensive project analysis |
 
 #### 4. Test Suite: `test.sh`
@@ -384,7 +384,7 @@ validate_filename() {
 
 ## Unicode Handling Architecture (v12.x)
 
-### The Unicode Stack (v12.1.6)
+### The Unicode Stack (v13.0.0)
 
 ```
 Input Filename (potentially NFD or NFC, with curly apostrophes)
@@ -411,7 +411,7 @@ interactive_prompt()        ← (if INTERACTIVE=true) Operator review via /dev/t
 Output Filename (NFC normalized, Unicode preserved, apostrophes normalized, operator-approved)
 ```
 
-### Key Functions (v12.1.6)
+### Key Functions (v13.0.0)
 
 #### 1. `sanitize_filename(name, mode, filesystem)` — Python 3 (v12.1.5+)
 
@@ -498,7 +498,7 @@ Uses `extract_utf8_chars()` to iterate over characters and `is_illegal_char()` t
 
 Uses explicit `case` statement to check each illegal character, returning 0 (illegal) or 1 (legal). The v12.1.4 fix added `!` to the caller so legal characters are preserved and illegal characters are replaced. In v12.1.5+, this function is primarily used in the bash fallback path and `validate_filename()`, as the main sanitization runs entirely in Python.
 
-### Configuration Variables (v12.1.6)
+### Configuration Variables (v13.0.0)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -811,7 +811,7 @@ This bypasses any stdin redirection and reads directly from the operator's termi
 
 ## Performance Characteristics
 
-### Benchmarked Scenario (v12.1.6)
+### Benchmarked Scenario (v13.0.0)
 
 | Metric | Value |
 |--------|-------|
@@ -847,7 +847,7 @@ This bypasses any stdin redirection and reads directly from the operator's termi
 FILESYSTEM=exfat \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 Observations on ~4,074-file library:
@@ -864,7 +864,7 @@ FILESYSTEM=exfat \
   SANITIZATION_MODE=conservative \
   INTERACTIVE=true \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.6.sh ~/Downloads
+  ./exfat-sanitizer-v13.0.0.sh ~/Downloads
 ```
 
 Ideal for curated collections where automated renaming may not produce the desired result — the operator can choose custom names while ensuring filesystem compatibility.
@@ -875,20 +875,20 @@ Ideal for curated collections where automated renaming may not produce the desir
 FILESYSTEM=universal \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/SharedDocs
+  ./exfat-sanitizer-v13.0.0.sh ~/SharedDocs
 ```
 
 ### 4. Pre-Backup Validation
 
 ```bash
 # 1. Generate tree snapshot (before)
-FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Data
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Data
 
 # 2. Review CSV for issues
 open sanitizer_exfat_*.csv
 
 # 3. Apply fixes
-FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Data
+FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Data
 
 # 4. Compare snapshots
 diff tree_exfat_*_before.csv tree_exfat_*_after.csv
@@ -903,7 +903,7 @@ FILESYSTEM=exfat \
   COPY_BEHAVIOR=skip \
   IGNORE_FILE=./exfat-sanitizer-ignore.txt \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 
 # Clean up macOS ._ files on destination
 dot_clean -m /Volumes/2.5ex/Musica/
@@ -919,7 +919,7 @@ find /Volumes/2.5ex/Musica/ -name '.DS_Store' -delete
 ```bash
 # Standard music library sanitization
 FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 ### Audio Curator (Interactive)
@@ -927,7 +927,7 @@ FILESYSTEM=exfat SANITIZATION_MODE=conservative DRY_RUN=false \
 ```bash
 # Review each rename decision for curated collections
 FILESYSTEM=exfat SANITIZATION_MODE=conservative INTERACTIVE=true \
-  DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+  DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 ### System Administrator
@@ -936,7 +936,7 @@ FILESYSTEM=exfat SANITIZATION_MODE=conservative INTERACTIVE=true \
 # Secure processing of untrusted files
 FILESYSTEM=universal SANITIZATION_MODE=strict \
   CHECK_SHELL_SAFETY=true CHECK_UNICODE_EXPLOITS=true \
-  DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh /shared/uploads
+  DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh /shared/uploads
 ```
 
 ### Backup Administrator
@@ -945,7 +945,7 @@ FILESYSTEM=universal SANITIZATION_MODE=strict \
 # Pre-sync validation with versioned backup
 FILESYSTEM=exfat COPY_TO=/backup/external COPY_BEHAVIOR=version \
   GENERATE_TREE=true DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh /media/source
+  ./exfat-sanitizer-v13.0.0.sh /media/source
 ```
 
 ---
@@ -1002,7 +1002,7 @@ FILESYSTEM=exfat COPY_TO=/backup/external COPY_BEHAVIOR=version \
 
 ## Version History & Bug Fixes
 
-### v12.1.6 — March 2026 ← CURRENT
+### v13.0.0 — March 2026 ← CURRENT
 
 **Stable release** consolidating all v12.1.x improvements.
 - All companion scripts (test.sh, audio-library.sh, backup-versioning.sh, security-scan.sh) updated
@@ -1018,7 +1018,7 @@ FILESYSTEM=exfat COPY_TO=/backup/external COPY_BEHAVIOR=version \
 - `interactive_prompt()` with `/dev/tty` terminal I/O
 - **CRITICAL IMPROVEMENT:** Entire character-level sanitization moved to Python
 - Bash fallback retained with explicit warning
-- **Status:** SUPERSEDED — Use v12.1.6
+- **Status:** SUPERSEDED — Use v13.0.0
 
 ### v12.1.4 — February 17, 2026
 
@@ -1027,7 +1027,7 @@ FILESYSTEM=exfat COPY_TO=/backup/external COPY_BEHAVIOR=version \
 - Fix: Added `!` (NOT) operator: `if ! is_illegal_char "$char"` → NOT illegal = preserve
 - Also: NFD/NFC normalization comparison preserved from v12.1.3
 - Also: `DEBUG_UNICODE` diagnostic mode preserved from v12.1.3
-- **Status:** SUPERSEDED — Use v12.1.6
+- **Status:** SUPERSEDED — Use v13.0.0
 
 ### v12.1.3 — February 4, 2026
 
@@ -1035,7 +1035,7 @@ Feature: NFD/NFC normalization comparison + DEBUG_UNICODE mode
 - Fixed false `RENAMED` status on macOS NFD filenames
 - Added `DEBUG_UNICODE=true` for normalization diagnostics
 - **KNOWN BUG:** Inverted `if/else` logic (fixed in v12.1.4)
-- **Status:** SUPERSEDED — Skip, use v12.1.6
+- **Status:** SUPERSEDED — Skip, use v13.0.0
 
 ### v12.1.2 — February 3, 2026
 
@@ -1134,7 +1134,7 @@ Initial Production Release
 
 ## Code Quality Assessment
 
-### Strengths (v12.1.6)
+### Strengths (v13.0.0)
 
 - Full Python 3-based character-level sanitization (v12.1.5+)
 - Explicit Unicode code point handling
@@ -1187,7 +1187,7 @@ Initial Production Release
 
 - **Scope:** Overview, installation, quick examples, full configuration reference
 - **Target:** New users
-- **Highlights:** v12.1.6 features, interactive mode, AppleDouble handling, all 6 filesystem types
+- **Highlights:** v13.0.0 features, interactive mode, AppleDouble handling, all 6 filesystem types
 - **Completeness:** Excellent
 
 ### QUICK_START_GUIDE.md (~25KB)
@@ -1205,16 +1205,16 @@ Initial Production Release
 - **Technical depth:** Complete Python 3 code examples, before/after comparisons
 - **Completeness:** Comprehensive reference
 
-### RELEASE-v12.1.6.md (~16KB)
+### RELEASE-v13.0.0.md (~16KB)
 
 - **Scope:** Version-specific changes including interactive mode and all critical fixes
 - **Detail level:** Very high (problem, root cause, solution, testing)
 - **Includes:** Before/after code comparison for all bug fixes and new features
 - **Completeness:** Excellent technical explanation
 
-### CHANGELOG-v12.1.6.md (~15KB)
+### CHANGELOG-v13.0.0.md (~15KB)
 
-- **Scope:** Complete version history from v9.0.1 to v12.1.6
+- **Scope:** Complete version history from v9.0.1 to v13.0.0
 - **Format:** Structured by version with categories
 - **Includes:** Feature matrix, upgrade path, recommended versions
 - **Completeness:** Full history
@@ -1229,7 +1229,7 @@ Initial Production Release
 
 ## Critical Success Factors
 
-### What Makes v12.1.6 Production-Ready
+### What Makes v13.0.0 Production-Ready
 
 1. **Unicode Safety**
    - Full Python 3-based character-level sanitization (v12.1.5+)
@@ -1273,7 +1273,7 @@ Initial Production Release
 
 | Metric | Value |
 |--------|-------|
-| Version | 12.1.6 |
+| Version | 13.0.0 |
 | Script Size | ~25KB |
 | Documentation | ~120KB+ (6 documents) |
 | Test Coverage | 20 tests |
@@ -1321,7 +1321,7 @@ Initial Production Release
 
 ### For Users
 
-1. Upgrade to v12.1.6 immediately (critical bug fixes + interactive mode)
+1. Upgrade to v13.0.0 immediately (critical bug fixes + interactive mode)
 2. Install Python 3.6+ if not already present
 3. Test in dry-run mode before production use
 4. Try `INTERACTIVE=true` for curated collections
@@ -1347,7 +1347,7 @@ Initial Production Release
 
 ## Conclusion
 
-exfat-sanitizer v12.1.6 represents the culmination of iterative development from v9.0.1 (basic sanitization) to v12.1.6 (Unicode-safe, interactive, production-ready).
+exfat-sanitizer v13.0.0 represents the culmination of iterative development from v9.0.1 (basic sanitization) to v13.0.0 (Unicode-safe, interactive, production-ready).
 
 The v12.1.x series demonstrates both reactive engineering (critical bug fixes) and proactive feature development:
 
@@ -1374,9 +1374,9 @@ The v12.1.x series demonstrates both reactive engineering (critical bug fixes) a
 **Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
 **License:** MIT
 **Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)
-**Status:** Production-Ready (v12.1.6)
+**Status:** Production-Ready (v13.0.0)
 **Last Updated:** March 7, 2026
 
 ---
 
-*This analysis represents a comprehensive evaluation of the exfat-sanitizer project at v12.1.6, documenting its evolution, architecture, and production readiness. For technical implementation details, see [DOCUMENTATION.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/DOCUMENTATION.md). For quick usage, see [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md).*
+*This analysis represents a comprehensive evaluation of the exfat-sanitizer project at v13.0.0, documenting its evolution, architecture, and production readiness. For technical implementation details, see [DOCUMENTATION.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/DOCUMENTATION.md). For quick usage, see [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md).*

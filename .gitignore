@@ -39,6 +39,9 @@ temp/
 # User-specific ignore file
 .exfat-sanitizer-ignore
 
+# Claude Code
+.claude/
+
 # IDE / Editor files
 .vscode/
 .idea/

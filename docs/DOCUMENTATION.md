@@ -3,8 +3,8 @@
 | Field | Value |
 |-------|-------|
 | **File** | `DOCUMENTATION.md` |
-| **Applies To** | `exfat-sanitizer-v12.1.6.sh` |
-| **Version** | 12.1.6 |
+| **Applies To** | `exfat-sanitizer-v13.0.0.sh` |
+| **Version** | 13.0.0 |
 | **Repository** | [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer) |
 | **Status** | Production-Ready — Critical Fix + New Feature Release |
 
@@ -12,7 +12,7 @@
 
 ## 1. Introduction
 
-This document provides a deep technical and conceptual dive into exfat-sanitizer v12.1.6, beyond what is covered in README.md and QUICK_START_GUIDE.md. It is intended for:
+This document provides a deep technical and conceptual dive into exfat-sanitizer v13.0.0, beyond what is covered in README.md and QUICK_START_GUIDE.md. It is intended for:
 
 - **Developers** who want to understand or extend the script
 - **Power users** who want to tune behavior deeply
@@ -23,8 +23,8 @@ This document provides a deep technical and conceptual dive into exfat-sanitizer
 If you just want to use the tool, start with:
 1. [README.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/README.md) — Overview and feature list
 2. [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md) — Getting started guide
-3. [RELEASE-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.6.md) — Release notes
-4. [CHANGELOG-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.6.md) — Version history
+3. [RELEASE-v13.0.0.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v13.0.0.md) — Release notes
+4. [CHANGELOG-v13.0.0.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v13.0.0.md) — Version history
 
 This document assumes familiarity with bash, filesystems, Unicode, and command-line workflows.
 
@@ -78,11 +78,11 @@ macOS stores filenames in **NFD** (Normalized Form Decomposed) where `ò` = `o` 
 NFD "ò" (from macOS disk) ≠ NFC "ò" (from sanitization) → FALSE POSITIVE RENAME
 ```
 
-v12.1.6 normalizes both the original and sanitized names to NFC before comparison, preventing false `RENAMED` status.
+v13.0.0 normalizes both the original and sanitized names to NFC before comparison, preventing false `RENAMED` status.
 
-#### Bash vs Python: The Fundamental Tension (v12.1.6 Fix)
+#### Bash vs Python: The Fundamental Tension (v13.0.0 Fix)
 
-Bash is byte-oriented. Python is character-oriented. This distinction is the root cause of the critical UTF-8 bug fixed in v12.1.6.
+Bash is byte-oriented. Python is character-oriented. This distinction is the root cause of the critical UTF-8 bug fixed in v13.0.0.
 
 ```
 Bash pipe processing of È (U+00C8):
@@ -94,7 +94,7 @@ Python processing of È (U+00C8):
   Iteration: for c in text → c = 'È' → PRESERVED ✅
 ```
 
-Prior to v12.1.6, the `extract_utf8_chars | while IFS= read -r char` pipeline split multibyte sequences on macOS (bash 3.2), silently dropping characters like È, è, à, ì, ò, ù. v12.1.6 moves the entire character-level sanitization into Python, eliminating this class of bugs entirely.
+Prior to v13.0.0, the `extract_utf8_chars | while IFS= read -r char` pipeline split multibyte sequences on macOS (bash 3.2), silently dropping characters like È, è, à, ì, ò, ù. v13.0.0 moves the entire character-level sanitization into Python, eliminating this class of bugs entirely.
 
 ### 2.3 Core Solution
 
@@ -102,11 +102,11 @@ exfat-sanitizer solves cross-platform filename issues by:
 
 1. Scanning a directory tree recursively
 2. Evaluating each filename against selected filesystem rules
-3. Preserving Unicode/accented characters via Python-based sanitization (v12.1.6)
+3. Preserving Unicode/accented characters via Python-based sanitization (v13.0.0)
 4. Normalizing apostrophes safely (v12.1.2 fix)
 5. Normalizing NFD→NFC for consistent comparison (v12.1.3+ fix)
 6. Sanitizing illegal characters only (configurable strictness)
-7. Optionally prompting operator for interactive rename decisions (v12.1.6)
+7. Optionally prompting operator for interactive rename decisions (v13.0.0)
 8. Recording all decisions in detailed CSV logs
 9. Optionally copying sanitized data to new destinations with conflict resolution
 
@@ -141,7 +141,7 @@ exfat-sanitizer solves cross-platform filename issues by:
        ├── Normalize to NFC (normalize_unicode) ← v12.1.3+
        ├── Sanitize filename (sanitize_filename)
        │   ├── Normalize apostrophes (Python 3, v12.1.2+)
-       │   ├── Python-based single-pass sanitization (v12.1.6) ← NEW
+       │   ├── Python-based single-pass sanitization (v13.0.0) ← NEW
        │   │   ├── Control character detection
        │   │   ├── Shell metacharacter replacement
        │   │   ├── Zero-width Unicode exploit removal
@@ -151,7 +151,7 @@ exfat-sanitizer solves cross-platform filename issues by:
        │   └── Handle reserved names (FAT32/universal)
        ├── Compare NFC(original) vs NFC(sanitized) ← v12.1.3+
        ├── DEBUG_UNICODE output (optional) ← v12.1.3+
-       ├── Interactive prompt (if INTERACTIVE=true) ← v12.1.6 NEW
+       ├── Interactive prompt (if INTERACTIVE=true) ← v13.0.0 NEW
        │   ├── Display current + suggested name
        │   ├── Read operator input from /dev/tty
        │   ├── Validate input against filesystem rules
@@ -172,7 +172,7 @@ exfat-sanitizer solves cross-platform filename issues by:
 - **Python 3.6+** — Character-level sanitization, apostrophe normalization, Unicode normalization
 - **Standard Unix tools** — `find`, `sed`, `grep`, `awk`, `mv`, `cp`
 
-**Why Python 3 is critical (since v12.1.6):**
+**Why Python 3 is critical (since v13.0.0):**
 
 Three core operations now run in Python:
 
@@ -221,10 +221,10 @@ Three core operations now run in Python:
 | `should_ignore()` | Bash | 285–340 | Pattern-based file exclusion |
 | `normalize_apostrophes()` | Bash+Python | 342–379 | Curly→straight apostrophe (v12.1.2) |
 | `is_illegal_char()` | Bash | 381–403 | Character legality check |
-| `validate_filename()` | Bash | 405–430 | Validate name against filesystem rules **(v12.1.6 NEW)** |
-| `interactive_prompt()` | Bash | 432–491 | Interactive rename dialog **(v12.1.6 NEW)** |
-| `sanitize_filename()` | Bash+Python | 493–622 | Core sanitization pipeline **(v12.1.6 REWRITTEN)** |
-| `process_directory()` | Bash | 628–740 | Recursive directory processing **(v12.1.6 MODIFIED)** |
+| `validate_filename()` | Bash | 405–430 | Validate name against filesystem rules **(v13.0.0 NEW)** |
+| `interactive_prompt()` | Bash | 432–491 | Interactive rename dialog **(v13.0.0 NEW)** |
+| `sanitize_filename()` | Bash+Python | 493–622 | Core sanitization pipeline **(v13.0.0 REWRITTEN)** |
+| `process_directory()` | Bash | 628–740 | Recursive directory processing **(v13.0.0 MODIFIED)** |
 | `main()` | Bash | 746+ | Entry point, usage, startup banner |
 
 ---
@@ -300,7 +300,7 @@ Path limits are conservative for cross-platform compatibility, ensuring compatib
 
 ---
 
-## 5. Unicode Handling Architecture (v12.1.6)
+## 5. Unicode Handling Architecture (v13.0.0)
 
 ### 5.1 The Unicode Stack
 
@@ -311,7 +311,7 @@ Input Filename (potentially NFD or NFC)
 normalize_apostrophes()     ← Python 3 (v12.1.2 FIX): Safe Unicode-aware
     │
     ▼
-sanitize_filename()         ← Python 3 single-pass pipeline (v12.1.6 REWRITE)
+sanitize_filename()         ← Python 3 single-pass pipeline (v13.0.0 REWRITE)
     │   ├── Control character detection (ASCII 0-31, 127)
     │   ├── Shell metacharacter replacement (if CHECK_SHELL_SAFETY)
     │   ├── Zero-width character removal (if CHECK_UNICODE_EXPLOITS)
@@ -323,8 +323,8 @@ normalize_unicode()         ← Python 3 / uconv / Perl: NFD → NFC conversion
     │
     ▼
 [if INTERACTIVE=true]
-interactive_prompt()        ← Operator-driven name choice (v12.1.6 NEW)
-    │   ├── validate_filename()   ← Input validation (v12.1.6 NEW)
+interactive_prompt()        ← Operator-driven name choice (v13.0.0 NEW)
+    │   ├── validate_filename()   ← Input validation (v13.0.0 NEW)
     │   ├── is_reserved_name()    ← Windows reserved name check
     │   └── Empty/whitespace check
     │
@@ -334,24 +334,24 @@ Output Filename (NFC normalized, Unicode preserved, operator-approved)
 
 ### 5.2 Key Functions
 
-#### `sanitize_filename(name, mode, filesystem)` — Python Core (v12.1.6 REWRITE)
+#### `sanitize_filename(name, mode, filesystem)` — Python Core (v13.0.0 REWRITE)
 
 **Purpose:** Transform a filename to comply with the target filesystem rules while preserving all legal Unicode characters.
 
-**v12.1.6 Architecture Change:**
+**v13.0.0 Architecture Change:**
 
-Prior to v12.1.6, character-level iteration used bash pipes:
+Prior to v13.0.0, character-level iteration used bash pipes:
 ```
 name → extract_utf8_chars (Python) → bash pipe → while IFS= read -r char → bash if/else
 ```
 This pipeline split multibyte UTF-8 sequences on macOS bash 3.2, silently dropping characters.
 
-v12.1.6 runs the entire character loop in Python:
+v13.0.0 runs the entire character loop in Python:
 ```
 name → Python (single script: all checks in one pass) → sanitized result
 ```
 
-**Implementation (v12.1.6):**
+**Implementation (v13.0.0):**
 
 ```python
 import sys
@@ -408,7 +408,7 @@ print(sanitized)
 **Bash Fallback:**
 If Python 3 is unavailable, the script falls back to the old bash-based character loop with a stderr warning. This fallback may exhibit the multibyte UTF-8 loss issue and is provided only for emergency compatibility.
 
-#### `validate_filename(name, filesystem)` — v12.1.6 NEW
+#### `validate_filename(name, filesystem)` — v13.0.0 NEW
 
 **Purpose:** Check a proposed filename against the target filesystem's illegal character set. Returns illegal characters found (if any) and exit code 0 (valid) or 1 (invalid).
 
@@ -436,7 +436,7 @@ validate_filename() {
 
 **Used by:** `interactive_prompt()` to validate operator-provided names before accepting them.
 
-#### `interactive_prompt(original, suggested, type, filesystem)` — v12.1.6 NEW
+#### `interactive_prompt(original, suggested, type, filesystem)` — v13.0.0 NEW
 
 **Purpose:** Display an interactive rename dialog, read operator input, validate it, and return the chosen name.
 
@@ -574,7 +574,7 @@ for old, new in replacements.items():
 
 **Implementation:** Uses explicit `case` statement to check each illegal character, returning 0 (true/illegal) or 1 (false/legal).
 
-**Note:** In v12.1.6, this function is primarily used by `validate_filename()` for interactive mode validation. The main sanitization loop now runs in Python and checks characters directly with `if c in illegal_chars`.
+**Note:** In v13.0.0, this function is primarily used by `validate_filename()` for interactive mode validation. The main sanitization loop now runs in Python and checks characters directly with `if c in illegal_chars`.
 
 ### 5.3 Configuration Variables
 
@@ -584,14 +584,14 @@ for old, new in replacements.items():
 | `NORMALIZE_APOSTROPHES` | `true` | Normalize curly apostrophes (v12.1.2 FIXED) |
 | `EXTENDED_CHARSET` | `true` | Allow extended character sets |
 | `DEBUG_UNICODE` | `false` | NFD/NFC diagnostic output to stderr (v12.1.3+) |
-| `INTERACTIVE` | `false` | Prompt operator for each rename decision (v12.1.6 NEW) |
+| `INTERACTIVE` | `false` | Prompt operator for each rename decision (v13.0.0 NEW) |
 
 ### 5.4 DEBUG_UNICODE Mode (v12.1.3+)
 
 When `DEBUG_UNICODE=true`, the script prints diagnostic output to stderr for every item processed:
 
 ```bash
-DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music 2>debug.log
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music 2>debug.log
 ```
 
 Output format:
@@ -645,7 +645,7 @@ file$(cmd).txt         → file__cmd_.txt (shell chars removed)
 - Fastest, least invasive
 - Best for: Speed-optimized workflows
 
-### 6.2 Sanitization Pipeline (v12.1.6)
+### 6.2 Sanitization Pipeline (v13.0.0)
 
 The `sanitize_filename()` function implements a Python-based single-pass pipeline:
 
@@ -656,7 +656,7 @@ Stage 1:  Normalize apostrophes (Python 3, v12.1.2+)
           "Loïc Nottet's Song<Test>2024.flac"
           (curly→straight if applicable; straight apostrophe preserved)
 
-Stage 2:  Python single-pass character classification (v12.1.6 REWRITE)
+Stage 2:  Python single-pass character classification (v13.0.0 REWRITE)
           For each Unicode code point:
             if control char (0-31, 127) → drop (or replace in strict)
             if shell dangerous & CHECK_SHELL_SAFETY → replace
@@ -671,14 +671,14 @@ Stage 3:  Leading/trailing cleanup
 Stage 4:  Reserved names (Windows/DOS)
           (not a reserved name)
 
-Stage 5:  [If INTERACTIVE=true] Interactive prompt (v12.1.6 NEW)
+Stage 5:  [If INTERACTIVE=true] Interactive prompt (v13.0.0 NEW)
           Operator reviews and accepts/modifies the suggested name
 
 Output: "Loïc Nottet's Song_Test_2024.flac"
 Status: RENAMED (< and > removed, accents + apostrophe preserved!)
 ```
 
-**Key difference from v12.1.4:** Stages 1–3 previously ran as separate bash loops with Python subprocesses for character extraction. In v12.1.6, stages 2–3 run as a single embedded Python script, eliminating the bash pipe that caused multibyte character loss.
+**Key difference from v12.1.4:** Stages 1–3 previously ran as separate bash loops with Python subprocesses for character extraction. In v13.0.0, stages 2–3 run as a single embedded Python script, eliminating the bash pipe that caused multibyte character loss.
 
 ### 6.3 Character Replacement
 
@@ -706,7 +706,7 @@ Applied in `fat32`, `ntfs`, and `universal` modes. In interactive mode, reserved
 
 ---
 
-## 7. Interactive Mode Architecture (v12.1.6)
+## 7. Interactive Mode Architecture (v13.0.0)
 
 ### 7.1 Design Goals
 
@@ -715,7 +715,7 @@ Interactive mode addresses the need for operator control in scenarios where auto
 ### 7.2 Activation
 
 ```bash
-INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 The `INTERACTIVE` environment variable defaults to `false`, preserving backward compatibility with all existing scripts and automation.
@@ -915,11 +915,11 @@ For each directory:
 1. Skip if system directory (`should_skip_system_file`)
 2. Skip if matches ignore pattern (`should_ignore`)
 3. Normalize name to NFC (`normalize_unicode`) ← v12.1.3+
-4. Sanitize dirname via `sanitize_filename()` ← v12.1.6: Python-based
+4. Sanitize dirname via `sanitize_filename()` ← v13.0.0: Python-based
 5. Normalize sanitized name to NFC ← v12.1.3+
 6. Compare NFC(original) vs NFC(sanitized) — prevents NFD/NFC false positives
 7. Optional `DEBUG_UNICODE` output ← v12.1.3+
-8. If mismatch and `INTERACTIVE=true`: prompt operator ← v12.1.6 NEW
+8. If mismatch and `INTERACTIVE=true`: prompt operator ← v13.0.0 NEW
 9. Copy if `COPY_TO` set
 10. Branch based on `DRY_RUN`:
    - `DRY_RUN=true` → Log only, no `mv`
@@ -1064,11 +1064,11 @@ File|01 Rhythm Inside.flac|Loïc Nottet/2015 Rhythm Inside/01 Rhythm Inside.flac
 
 ```bash
 # Before sanitization
-FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music
+FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music
 # Generates: tree_fat32_20260306_120000.csv (before)
 
 # After sanitization
-FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+FILESYSTEM=fat32 GENERATE_TREE=true DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 # Generates: tree_fat32_20260306_120100.csv (after)
 
 # Compare
@@ -1171,7 +1171,7 @@ Created in the current working directory where the script is run:
 
 ```bash
 pwd  # /Users/username
-./exfat-sanitizer-v12.1.6.sh ~/Music
+./exfat-sanitizer-v13.0.0.sh ~/Music
 # Creates: /Users/username/sanitizer_fat32_20260306_123456.csv
 ```
 
@@ -1210,7 +1210,7 @@ On validation failure: clear error message to stderr, exit with non-zero status,
 
 ```bash
 if command -v python3 >/dev/null 2>&1; then
-    # Use Python-based sanitization pipeline (v12.1.6)
+    # Use Python-based sanitization pipeline (v13.0.0)
 else
     echo "⚠️  WARNING: Using bash fallback for sanitization - UTF-8 may be affected!" >&2
     # Fall back to bash character loop
@@ -1235,7 +1235,7 @@ file$(rm -rf /).sh
 file__rm -rf __.sh
 ```
 
-In the Python-based pipeline (v12.1.6), shell dangerous characters are checked via set membership: `if c in shell_dangerous`.
+In the Python-based pipeline (v13.0.0), shell dangerous characters are checked via set membership: `if c in shell_dangerous`.
 
 **When to use:** Processing files from internet, email attachments, or untrusted sources; files that will be used in automation scripts.
 
@@ -1283,18 +1283,18 @@ Scope: strictly names and paths only.
 4. Python 3 subprocess calls (~10–20ms process spawn overhead per call)
 5. Interactive mode pauses (user response time)
 
-### 17.2 v12.1.6 Performance Profile
+### 17.2 v13.0.0 Performance Profile
 
 The Python-based sanitization pipeline changes the performance characteristics:
 
-| Component | v12.1.4 | v12.1.6 | Impact |
+| Component | v12.1.4 | v13.0.0 | Impact |
 |-----------|---------|---------|--------|
 | Character extraction | Python subprocess per file | Integrated in sanitize_filename | Fewer subprocesses |
 | Character classification | Bash loop per file | Python loop per file | ~Same total time |
 | Apostrophe normalization | Python subprocess per file | Python subprocess per file | Unchanged |
 | Overall per-file overhead | ~3 Python calls | ~2 Python calls | ~33% fewer spawns |
 
-The net performance impact of v12.1.6 is approximately neutral — one fewer Python subprocess per file, but the single Python call does slightly more work.
+The net performance impact of v13.0.0 is approximately neutral — one fewer Python subprocess per file, but the single Python call does slightly more work.
 
 ### 17.3 Benchmarks
 
@@ -1328,7 +1328,7 @@ Scalability: linear with item count. CPU-bound for dry-run; IO-bound for copy op
 FILESYSTEM=fat32 \
   SANITIZATION_MODE=conservative \
   DRY_RUN=true \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 Observations on ~4,074-file library: 0 files renamed (all compliant), all accents preserved (French, Italian artists including È, è, à, ò), apostrophes preserved (dell'Amore, Cos'è), only illegal characters (`<`, `>`, `:`, `*`) would be replaced, typical execution time: ~15 seconds.
@@ -1340,7 +1340,7 @@ FILESYSTEM=exfat \
   SANITIZATION_MODE=conservative \
   INTERACTIVE=true \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 For music libraries with international filenames, interactive mode lets the operator review each rename and choose preferred alternatives. The operator can accept auto-suggestions (press Enter) or type custom names that are validated in real-time.
@@ -1351,7 +1351,7 @@ For music libraries with international filenames, interactive mode lets the oper
 FILESYSTEM=universal \
   SANITIZATION_MODE=conservative \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/SharedDocs
+  ./exfat-sanitizer-v13.0.0.sh ~/SharedDocs
 ```
 
 Maximum compatibility — works everywhere, still preserves Unicode/accents, removes only truly problematic characters.
@@ -1360,16 +1360,16 @@ Maximum compatibility — works everywhere, still preserves Unicode/accents, rem
 
 ```bash
 # 1. Generate tree snapshot (before)
-FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Data
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Data
 
 # 2. Review CSV for issues
 open sanitizer_exfat_*.csv
 
 # 3. Apply fixes if needed
-FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Data
+FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Data
 
 # 4. Generate tree snapshot (after)
-FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Data
+FILESYSTEM=exfat GENERATE_TREE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Data
 
 # 5. Compare snapshots
 diff tree_exfat_*_before.csv tree_exfat_*_after.csv
@@ -1385,7 +1385,7 @@ FILESYSTEM=exfat \
   INTERACTIVE=true \
   IGNORE_FILE=./exfat-sanitizer-ignore.txt \
   DRY_RUN=false \
-  ./exfat-sanitizer-v12.1.6.sh ~/Music
+  ./exfat-sanitizer-v13.0.0.sh ~/Music
 ```
 
 Result: source untouched, destination has operator-approved sanitized names, tree export for documentation.
@@ -1495,7 +1495,7 @@ CHECK_UNICODE_EXPLOITS=false
 Reverse operations using CSV log:
 
 ```bash
-./exfat-sanitizer-v12.1.6.sh --undo sanitizer_fat32_20260306_123456.csv
+./exfat-sanitizer-v13.0.0.sh --undo sanitizer_fat32_20260306_123456.csv
 ```
 
 Implementation: read CSV in reverse, rename from New→Old for each `RENAMED` entry, validate no conflicts.
@@ -1503,7 +1503,7 @@ Implementation: read CSV in reverse, rename from New→Old for each `RENAMED` en
 ### 20.4 Parallel Processing (Proposed)
 
 ```bash
-PARALLEL_JOBS=4 ./exfat-sanitizer-v12.1.6.sh ~/BigData
+PARALLEL_JOBS=4 ./exfat-sanitizer-v13.0.0.sh ~/BigData
 ```
 
 Challenges: collision detection needs synchronization, counter updates need atomic operations, directory renaming order must be preserved.
@@ -1573,7 +1573,7 @@ Recommended test categories:
    - Maximum path lengths
    - Apostrophe-heavy filenames: `dell'Amore`, `Cos'è`
 
-4. **Regression tests (v12.1.6 specific):**
+4. **Regression tests (v13.0.0 specific):**
    - Accent preservation: `Loïc`, `Révérence`, `Cè di più`, `Èssere`
    - Apostrophe preservation: `dell'Amore`, `Cos'è`, `L'été`
    - Mixed accents and illegal chars: `Café<test>.mp3`
@@ -1597,7 +1597,7 @@ Recommended test categories:
 
 ```bash
 # Enable verbose output
-bash -x ./exfat-sanitizer-v12.1.6.sh ~/Music 2>&1 | head -100
+bash -x ./exfat-sanitizer-v13.0.0.sh ~/Music 2>&1 | head -100
 
 # Check Python 3 availability
 command -v python3 && python3 --version
@@ -1636,7 +1636,7 @@ print(f'Equal: {nfd == nfc}')
 "
 
 # Enable DEBUG_UNICODE
-DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v12.1.6.sh ~/Music 2>debug.log
+DEBUG_UNICODE=true DRY_RUN=true ./exfat-sanitizer-v13.0.0.sh ~/Music 2>debug.log
 grep "MISMATCH" debug.log
 ```
 
@@ -1683,8 +1683,8 @@ Why this change is needed
 
 | Version | Bug | Root Cause | Fix |
 |---------|-----|-----------|-----|
-| v12.1.6 | Multibyte UTF-8 chars dropped (È, è, à) | Bash pipe splits multibyte sequences | Python-based sanitization pipeline |
-| v12.1.6 | Straight apostrophe `'` dropped | Bash loop mishandled character | Python pipeline preserves legal chars |
+| v13.0.0 | Multibyte UTF-8 chars dropped (È, è, à) | Bash pipe splits multibyte sequences | Python-based sanitization pipeline |
+| v13.0.0 | Straight apostrophe `'` dropped | Bash loop mishandled character | Python pipeline preserves legal chars |
 | v12.1.4 | Inverted `if/else` in sanitize_filename | Missing `!` operator | Added NOT operator to conditional |
 | v12.1.3 | NFD/NFC false positives on macOS | No normalization before comparison | NFC normalization on both sides |
 | v12.1.2 | Apostrophe normalization corrupts UTF-8 | Bash glob patterns on multi-byte | Python-based code point replacement |
@@ -1703,7 +1703,7 @@ Why this change is needed
 
 **Q1: Why Python 3 instead of pure bash?**
 
-Bash is byte-oriented; Python is character-oriented. This distinction caused every critical UTF-8 bug in the project's history. v12.1.6 makes this architectural commitment explicit by running the entire sanitization loop in Python.
+Bash is byte-oriented; Python is character-oriented. This distinction caused every critical UTF-8 bug in the project's history. v13.0.0 makes this architectural commitment explicit by running the entire sanitization loop in Python.
 
 ```bash
 # Bash (BROKEN on macOS): byte-level pipe processing
@@ -1723,7 +1723,7 @@ Ensures pipeline errors are caught. Without it, `cmd1 | cmd2` succeeds even if `
 
 **Q4: What's the performance impact of the Python-based pipeline?**
 
-Approximately neutral compared to v12.1.4. The v12.1.6 pipeline makes ~2 Python calls per file (sanitize + normalize) vs ~3 in v12.1.4 (extract_chars + sanitize apostrophes + normalize). The single sanitize call does more work but eliminates one subprocess spawn.
+Approximately neutral compared to v12.1.4. The v13.0.0 pipeline makes ~2 Python calls per file (sanitize + normalize) vs ~3 in v12.1.4 (extract_chars + sanitize apostrophes + normalize). The single sanitize call does more work but eliminates one subprocess spawn.
 
 **Q5: Can I use the script without Python 3?**
 
@@ -1774,7 +1774,7 @@ The operator-chosen name is used for both the local rename and the destination f
 | **Reserved Names** | Filenames with special meaning (e.g., Windows DOS device names: CON, PRN, NUL) |
 | **Sanitization** | Process of transforming names to conform to filesystem rules |
 | **Dry Run** | Preview mode where no actual changes occur — only logs produced |
-| **Interactive Mode** | Operator-driven mode where each rename is prompted for approval (v12.1.6) |
+| **Interactive Mode** | Operator-driven mode where each rename is prompted for approval (v13.0.0) |
 | **CSV Log** | Pipe-delimited file containing detailed record of operations |
 | **Tree Export** | CSV representation of directory hierarchy structure |
 | **Shell Metacharacters** | Characters with special meaning to shells (e.g., `$`, `` ` ``, `&`) |
@@ -1783,7 +1783,7 @@ The operator-chosen name is used for both the local rename and the destination f
 | **NFD** | Normalized Form Decomposed — e.g., `è` = `e` + combining accent |
 | **NFC** | Normalized Form Composed — e.g., `è` = single code point |
 | **AppleDouble** | macOS `._` companion files storing resource forks and extended attributes |
-| **Python-Based Pipeline** | v12.1.6 architecture where character-level sanitization runs in Python |
+| **Python-Based Pipeline** | v13.0.0 architecture where character-level sanitization runs in Python |
 | **Bash Fallback** | Legacy character loop used only when Python 3 is unavailable |
 
 ### Status Values
@@ -1806,23 +1806,23 @@ The operator-chosen name is used for both the local rename and the destination f
 
 **Technical Excellence:**
 - Multi-filesystem aware rules (6 filesystem modes)
-- Python-based sanitization pipeline (v12.1.6) — native Unicode safety
+- Python-based sanitization pipeline (v13.0.0) — native Unicode safety
 - Safe apostrophe normalization (v12.1.2 fix)
 - Correct character classification logic (v12.1.4 fix)
 - NFD→NFC normalization (v12.1.3+ fix)
-- Multibyte UTF-8 preservation (v12.1.6 fix)
+- Multibyte UTF-8 preservation (v13.0.0 fix)
 - Configurable sanitization pipeline
 - Rich logging and audit trail
 
 **Safety-First Design:**
 - Default dry-run mode
-- Interactive mode for operator control (v12.1.6)
+- Interactive mode for operator control (v13.0.0)
 - Never deletes files
 - Collision detection
 - Complete CSV logs
 - Conservative path limits
 
-**Unicode Support (v12.1.6):**
+**Unicode Support (v13.0.0):**
 - Full accent preservation (È, è, à, ì, ò, ù, ï, ê, ö, ü)
 - Apostrophe preservation (straight `'` U+0027 fully supported)
 - Python-based UTF-8 safety — no more byte splitting
@@ -1844,13 +1844,13 @@ The operator-chosen name is used for both the local rename and the destination f
 
 1. [README.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/README.md) — Overview and quick start
 2. [QUICK_START_GUIDE.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/QUICK_START_GUIDE.md) — Step-by-step guide
-3. [RELEASE-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v12.1.6.md) — What's new and critical fixes
+3. [RELEASE-v13.0.0.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/RELEASE-v13.0.0.md) — What's new and critical fixes
 4. **DOCUMENTATION.md** (this file) — Deep technical dive
-5. [CHANGELOG-v12.1.6.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v12.1.6.md) — Complete version history
+5. [CHANGELOG-v13.0.0.md](https://github.com/fbaldassarri/exfat-sanitizer/blob/main/CHANGELOG-v13.0.0.md) — Complete version history
 
 ---
 
 **Repository:** [https://github.com/fbaldassarri/exfat-sanitizer](https://github.com/fbaldassarri/exfat-sanitizer)
 **License:** MIT
 **Maintainer:** [fbaldassarri](https://github.com/fbaldassarri)
-**Version:** 12.1.6 | **Release Date:** March 6, 2026
+**Version:** 13.0.0 | **Release Date:** March 6, 2026

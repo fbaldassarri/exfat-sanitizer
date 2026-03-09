@@ -6,7 +6,7 @@ All notable changes to this project are documented in this file.
 
 ---
 
-## [v12.1.6](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.6) — 2026-03-06 — CRITICAL FIX + NEW FEATURE
+## [v13.0.0](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v13.0.0) — 2026-03-06 — CRITICAL FIX + NEW FEATURE
 
 **Upgrade Urgency:** CRITICAL
 
@@ -25,7 +25,7 @@ Fixes silent multibyte UTF-8 character loss on macOS by rewriting the sanitizati
   "Perchè no.mp3"             → "Perch  no.mp3"               # è dropped!
   "Ce la farò.wav"            → "Ce la far .wav"               # ò dropped!
 
-  # AFTER (v12.1.6) — FIXED
+  # AFTER (v13.0.0) — FIXED
   "Èssere o non Èssere.flac"  → "Èssere o non Èssere.flac"    # Preserved ✅
   "Perchè no.mp3"             → "Perchè no.mp3"               # Preserved ✅
   "Ce la farò.wav"            → "Ce la farò.wav"               # Preserved ✅
@@ -38,7 +38,7 @@ Fixes silent multibyte UTF-8 character loss on macOS by rewriting the sanitizati
   "dell'Amore.flac"  → "dellAmore.flac"   # Apostrophe dropped!
   "Cos'è.mp3"        → "Cos.mp3"          # Apostrophe + è dropped!
 
-  # AFTER (v12.1.6) — FIXED
+  # AFTER (v13.0.0) — FIXED
   "dell'Amore.flac"  → "dell'Amore.flac"  # Preserved ✅
   "Cos'è.mp3"        → "Cos'è.mp3"        # Preserved ✅
   ```
@@ -55,10 +55,10 @@ Fixes silent multibyte UTF-8 character loss on macOS by rewriting the sanitizati
 
   ```bash
   # Interactive mode with live changes
-  INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v12.1.6.sh ~/Music
+  INTERACTIVE=true FILESYSTEM=exfat DRY_RUN=false ./exfat-sanitizer-v13.0.0.sh ~/Music
 
   # Interactive mode preview (no changes applied)
-  INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v12.1.6.sh ~/Music
+  INTERACTIVE=true DRY_RUN=true FILESYSTEM=exfat ./exfat-sanitizer-v13.0.0.sh ~/Music
   ```
 
   Prompt example:
@@ -107,7 +107,7 @@ while IFS= read -r char; do
     fi
 done < <(extract_utf8_chars "$name")
 
-# AFTER (v12.1.6) — Python-based single pass
+# AFTER (v13.0.0) — Python-based single pass
 sanitized=$(python3 -c "
 import sys
 text = sys.stdin.read().strip()
@@ -133,7 +133,7 @@ print(''.join(result))
 
 ## [v12.1.5](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.5) — 2026-02 — INTERACTIVE MODE (Superseded)
 
-**Upgrade Urgency:** Superseded by v12.1.6
+**Upgrade Urgency:** Superseded by v13.0.0
 
 Added Interactive Mode but still uses the bash-based sanitization pipeline with the multibyte UTF-8 bug.
 
@@ -145,14 +145,14 @@ Added Interactive Mode but still uses the bash-based sanitization pipeline with 
 
 ### Known Issues
 
-- **Multibyte UTF-8 characters silently dropped** — The bash-based character pipeline still loses characters like È, è, à on macOS. Fixed in v12.1.6 with the Python-based sanitization pipeline.
-- **Straight apostrophe dropped** — `'` (U+0027) incorrectly removed during processing. Fixed in v12.1.6.
+- **Multibyte UTF-8 characters silently dropped** — The bash-based character pipeline still loses characters like È, è, à on macOS. Fixed in v13.0.0 with the Python-based sanitization pipeline.
+- **Straight apostrophe dropped** — `'` (U+0027) incorrectly removed during processing. Fixed in v13.0.0.
 
 ---
 
 ## [v12.1.4](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.4) — 2026-02-17 — BUG FIX
 
-**Upgrade Urgency:** Superseded by v12.1.6
+**Upgrade Urgency:** Superseded by v13.0.0
 
 Fixed inverted conditional logic in `sanitize_filename()` and consolidated all NFD/NFC normalization improvements.
 
@@ -177,7 +177,7 @@ Fixed inverted conditional logic in `sanitize_filename()` and consolidated all N
 ### Known Limitations
 
 - **macOS AppleDouble (`._`) files** — When using `COPY_TO` to copy files to exFAT/FAT32 volumes, macOS creates `._` companion files to store extended attributes. This is OS behavior, not a script bug. Cleanup: `dot_clean -m /Volumes/DRIVE/` or `find /Volumes/DRIVE/ -name '._*' -delete`
-- **UTF-8 character iteration** — The bash-based character-by-character pipeline may not preserve all multibyte Unicode sequences in some environments. Fixed in v12.1.6.
+- **UTF-8 character iteration** — The bash-based character-by-character pipeline may not preserve all multibyte Unicode sequences in some environments. Fixed in v13.0.0.
 
 ### Technical Details
 
@@ -206,7 +206,7 @@ fi
 
 ## [v12.1.3](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.3) — 2026-02-04 — BUG FIX (Superseded)
 
-**Upgrade Urgency:** Superseded by v12.1.6
+**Upgrade Urgency:** Superseded by v13.0.0
 
 Attempted fix for NFD/NFC comparison causing false `RENAMED` status on macOS.
 
@@ -227,7 +227,7 @@ Attempted fix for NFD/NFC comparison causing false `RENAMED` status on macOS.
 
 ## [v12.1.2](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.2) — 2026-02-03 — CRITICAL BUG FIX
 
-**Upgrade Urgency:** Superseded by v12.1.6
+**Upgrade Urgency:** Superseded by v13.0.0
 
 If you're using v12.1.1 or earlier with `NORMALIZE_APOSTROPHES=true` (default), upgrade immediately to prevent accent corruption.
 
@@ -264,7 +264,7 @@ If you're using v12.1.1 or earlier with `NORMALIZE_APOSTROPHES=true` (default), 
 
 ## [v12.1.1](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.1) — 2026-02-02 — Enhanced Comparison
 
-**⚠️ Known Bug:** Apostrophe normalization corrupts UTF-8. Skip this version — upgrade to v12.1.6.
+**⚠️ Known Bug:** Apostrophe normalization corrupts UTF-8. Skip this version — upgrade to v13.0.0.
 
 ### Improvements
 
@@ -275,7 +275,7 @@ If you're using v12.1.1 or earlier with `NORMALIZE_APOSTROPHES=true` (default), 
 
 ## [v12.1.0](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.1.0) — 2026-02-02 — Feature Consolidation
 
-**⚠️ Known Bug:** Apostrophe normalization corrupts UTF-8. Skip this version — upgrade to v12.1.6.
+**⚠️ Known Bug:** Apostrophe normalization corrupts UTF-8. Skip this version — upgrade to v13.0.0.
 
 ### New Features
 
@@ -295,7 +295,7 @@ If you're using v12.1.1 or earlier with `NORMALIZE_APOSTROPHES=true` (default), 
 
 ## [v12.0.0](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v12.0.0) — 2026-02-01 — Unicode Rewrite
 
-**⚠️ Known Bug:** Apostrophe normalization may have side effects. Upgrade to v12.1.6.
+**⚠️ Known Bug:** Apostrophe normalization may have side effects. Upgrade to v13.0.0.
 
 ### New Features
 
@@ -386,7 +386,7 @@ Combines the critical accent preservation fix from v11.0.5 with advanced feature
 
 ## [v9.0.2.2](https://github.com/fbaldassarri/exfat-sanitizer/releases/tag/v9.0.2.2) — 2026-01-30 — Advanced Features
 
-**⚠️ Critical Bug:** Strips all accented characters. Do not use — upgrade to v12.1.6.
+**⚠️ Critical Bug:** Strips all accented characters. Do not use — upgrade to v13.0.0.
 
 ### New Features
 
@@ -406,7 +406,7 @@ Combines the critical accent preservation fix from v11.0.5 with advanced feature
 
 ### Feature Matrix
 
-| Feature | v9.0.2.2 | v11.0.5 | v11.1.0 | v12.0.0 | v12.1.2 | v12.1.4 | v12.1.6 |
+| Feature | v9.0.2.2 | v11.0.5 | v11.1.0 | v12.0.0 | v12.1.2 | v12.1.4 | v13.0.0 |
 |---------|----------|---------|---------|---------|---------|---------|---------|
 | Accent Preservation | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | **Full** |
 | Apostrophe Handling | — | ✅ | ✅ | ⚠️ Bug | ✅ Fixed | ✅ | **Full** |
@@ -425,13 +425,13 @@ Combines the critical accent preservation fix from v11.0.5 with advanced feature
 
 ### Recommended Versions
 
-- **v12.1.6** — Latest, all known bugs fixed, Python-based sanitization, interactive mode ← **RECOMMENDED**
+- **v13.0.0** — Latest, all known bugs fixed, Python-based sanitization, interactive mode ← **RECOMMENDED**
 - **v12.1.4** — Stable, but lacks Python sanitization pipeline and interactive mode
 - **v11.1.0** — Stable legacy, comprehensive features, no Unicode rewrite bugs
 
 ### Versions to Avoid
 
-- **v12.1.5** — Multibyte UTF-8 bug still present, superseded by v12.1.6
+- **v12.1.5** — Multibyte UTF-8 bug still present, superseded by v13.0.0
 - **v12.1.1** — Critical apostrophe bug, corrupts UTF-8
 - **v12.1.0** — Same apostrophe bug
 - **v9.0.2.2** — Strips all accents
@@ -441,20 +441,20 @@ Combines the critical accent preservation fix from v11.0.5 with advanced feature
 ## Upgrade Path
 
 ```
-v9.0.2.2 ──→ v11.0.5 ──→ v11.1.0 ──→ v12.0.0 ──→ v12.1.2 ──→ v12.1.4 ──→ v12.1.6
+v9.0.2.2 ──→ v11.0.5 ──→ v11.1.0 ──→ v12.0.0 ──→ v12.1.2 ──→ v12.1.4 ──→ v13.0.0
 (Accent Bug)  (Fixed)     (+ Features)  (Unicode)   (+ Fixes)    (Logic Fix)  (LATEST)
                                                          │
                                             skip v12.1.0 & v12.1.1
                                             (Apostrophe corruption bug)
 ```
 
-**Recommendation:** Skip v12.0.0–v12.1.1 and v12.1.5, upgrade directly to v12.1.6.
+**Recommendation:** Skip v12.0.0–v12.1.1 and v12.1.5, upgrade directly to v13.0.0.
 
 ---
 
 ## Breaking Changes
 
-### v12.1.6
+### v13.0.0
 
 - No breaking changes from v12.1.4 or v12.1.5
 - New `INTERACTIVE` variable defaults to `false` (existing behavior unchanged)
@@ -482,7 +482,7 @@ v9.0.2.2 ──→ v11.0.5 ──→ v11.1.0 ──→ v12.0.0 ──→ v12.1.2
 
 ## Configuration Variables Evolution
 
-| Variable | v9.0.2.2 | v11.0.5 | v11.1.0 | v12.0.0+ | v12.1.6 |
+| Variable | v9.0.2.2 | v11.0.5 | v11.1.0 | v12.0.0+ | v13.0.0 |
 |----------|----------|---------|---------|----------|---------|
 | `FILESYSTEM` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `SANITIZATION_MODE` | ✅ | ✅ | ✅ | ✅ | ✅ |
